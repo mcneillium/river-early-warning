@@ -131,6 +131,56 @@ def write_tables(per_catchment: pd.DataFrame, seeds, prefix: str, reference: str
     print("\n".join(lines), flush=True)
 
 
+def transfer_cost(per_catchment: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    """The measure fixed in protocol_week4.md, amendment 2B.
+
+    Cost of transfer per catchment and seed: NSE of the model trained on fewer
+    catchments minus NSE of the seen model of the same family. The median is
+    over catchments and seeds pooled, with the range of per-seed medians. The
+    LSTM "transfers better" if its median cost is smaller than boosting's by
+    more than 0.01, "worse" if larger by more than 0.01, otherwise neither.
+    """
+    wide = per_catchment.pivot_table(index=["seed", "lead_days", "gauge_id"], columns="model", values="nse")
+    rows = []
+    for kind in ("wet_only", "random_half"):
+        lstm_name, boost_name = f"{prefix}_{kind}", f"regional_{kind}"
+        if not {lstm_name, f"{prefix}_seen", boost_name, "regional_seen"} <= set(wide.columns):
+            continue
+        lstm_cost = wide[lstm_name] - wide[f"{prefix}_seen"]
+        boost_cost = wide[boost_name] - wide["regional_seen"]
+        for lead in sorted(wide.index.get_level_values("lead_days").unique()):
+            lc, bc = lstm_cost.xs(lead, level="lead_days"), boost_cost.xs(lead, level="lead_days")
+            difference = lc.median() - bc.median()
+            verdict = "better" if difference > 0.01 else "worse" if difference < -0.01 else "neither"
+            rows.append({
+                "trained_on": kind, "lead_days": lead,
+                "lstm_cost": lc.median(), "lstm_cost_seed_min": lc.groupby("seed").median().min(),
+                "lstm_cost_seed_max": lc.groupby("seed").median().max(),
+                "boosting_cost": bc.median(), "boosting_cost_seed_min": bc.groupby("seed").median().min(),
+                "boosting_cost_seed_max": bc.groupby("seed").median().max(),
+                "lstm_minus_boosting": difference,
+                "share_lstm_loses_less": float(((lc - bc) > 0).mean()),
+                "lstm_transfers": verdict,
+            })
+    return pd.DataFrame(rows)
+
+
+def append_transfer_markdown(costs: pd.DataFrame, path: Path) -> None:
+    lines = ["", "Cost of transfer (protocol amendment 2B): per catchment, NSE of the model trained on fewer "
+             "catchments minus the seen model of the same family; median over catchments and seeds, "
+             "per-seed range in brackets.", "",
+             "| Trained on | Lead | LSTM cost | Boosting cost | LSTM minus boosting | LSTM loses less in | LSTM transfers |",
+             "| --- | ---: | ---: | ---: | ---: | ---: | --- |"]
+    for _, r in costs.iterrows():
+        lines.append(f"| {r['trained_on']} | {r['lead_days']} | {r['lstm_cost']:+.3f} ({r['lstm_cost_seed_min']:+.3f} to "
+                     f"{r['lstm_cost_seed_max']:+.3f}) | {r['boosting_cost']:+.3f} ({r['boosting_cost_seed_min']:+.3f} to "
+                     f"{r['boosting_cost_seed_max']:+.3f}) | {r['lstm_minus_boosting']:+.3f} | "
+                     f"{100 * r['share_lstm_loses_less']:.0f}% | {r['lstm_transfers']} |")
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    print("\n".join(lines), flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--data", type=Path, default=ROOT / "data")
@@ -233,15 +283,23 @@ def main() -> None:
             dry_block.insert(0, "seed", seed)
             dry_scores.append(dry_block)
 
-    write_tables(pd.concat(all_scores, ignore_index=True), args.seeds, f"{prefix}_seen",
-                 "regional_seen", args.results / f"table_lstm{tag}.csv", args.results / f"table_lstm{tag}.md",
-                 args.results / f"per_catchment_lstm{tag}.csv", "Experiment 6.")
+    if args.wet_to_dry and not args.unseen:
+        # A wet-to-dry run has no unseen-region models, so writing the main tables here
+        # would replace Experiment 6's full tables with a shorter version.
+        print("Wet-to-dry run: Experiment 6's main tables left unchanged.", flush=True)
+    else:
+        write_tables(pd.concat(all_scores, ignore_index=True), args.seeds, f"{prefix}_seen",
+                     "regional_seen", args.results / f"table_lstm{tag}.csv", args.results / f"table_lstm{tag}.md",
+                     args.results / f"per_catchment_lstm{tag}.csv", "Experiment 6.")
     if args.wet_to_dry:
         write_tables(pd.concat(dry_scores, ignore_index=True), args.seeds, f"{prefix}_wet_only",
                      "regional_wet_only", args.results / f"table_lstm_wet_to_dry{tag}.csv",
                      args.results / f"table_lstm_wet_to_dry{tag}.md",
                      args.results / f"per_catchment_lstm_wet_to_dry{tag}.csv",
                      f"Wet-to-dry test, scored on the {len(dry_control)} dry catchments outside the control half.")
+        costs = transfer_cost(pd.concat(dry_scores, ignore_index=True), prefix)
+        costs.round(4).to_csv(args.results / f"table_lstm_transfer_cost{tag}.csv", index=False)
+        append_transfer_markdown(costs, args.results / f"table_lstm_wet_to_dry{tag}.md")
 
 
 if __name__ == "__main__":

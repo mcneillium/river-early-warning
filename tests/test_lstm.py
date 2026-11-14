@@ -200,3 +200,18 @@ def test_foundation_inputs_end_on_the_issue_day_and_carry_no_later_weather():
         assert len(series) == run_foundation.CONTEXT and series[-1] == day
     (plain,) = run_foundation.inputs_for(panel, 0, np.array([day]), "chronos2_flow_only")
     assert "past_covariates" not in plain
+
+
+def test_transfer_cost_follows_the_rule_fixed_in_advance():
+    import pandas as pd
+
+    run_lstm = _load_script("run_lstm")
+    rows = []
+    for gauge in ("a", "b", "c"):
+        for model, nse in {"lstm_seen": 0.8, "lstm_wet_only": 0.6, "lstm_random_half": 0.795,
+                           "regional_seen": 0.8, "regional_wet_only": 0.75, "regional_random_half": 0.79}.items():
+            rows.append({"seed": 0, "lead_days": 1, "gauge_id": gauge, "model": model, "nse": nse})
+    costs = run_lstm.transfer_cost(pd.DataFrame(rows), "lstm").set_index("trained_on")
+    assert costs.loc["wet_only", "lstm_transfers"] == "worse"  # -0.20 against -0.05
+    assert abs(costs.loc["wet_only", "lstm_minus_boosting"] + 0.15) < 1e-9
+    assert costs.loc["random_half", "lstm_transfers"] == "neither"  # -0.005 against -0.01

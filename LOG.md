@@ -805,3 +805,72 @@ prediction left for Paul), `scripts/run_foundation.py`, one test, and a
 | G4 | Median as the point forecast; 0.05 and 0.95 for a 90% range | Matches Experiment 5's interval |
 | G5 | Compared with seed 0 of the trained models | The foundation model has no seed |
 | G6 | 0.02 NSE margin for "close", 0.01 for "weather helps" | Set before any result; Paul may change them before the run |
+
+## 2026-11-14 (night): results of the Experiment 6 follow-ups
+
+Run by Paul on his RTX 5090 (commit 994e944). Read and checked by the
+assistant against the rules in protocol_week4.md, amendment 2.
+
+### A. Settings chosen on the validation years
+
+`results/table_lstm_tuning_validation.md`. None of the seven alternatives
+beat the original settings on the validation years (mean median NSE 0.4009;
+the others 0.3863 to 0.3940). The rule chose `c0_original`.
+
+- c0 and c1 have identical scores. This is expected, not a bug: with the
+  same seed both draw the same training batches, and 4 of c1's epochs
+  (4 x 244 steps) equal 1 of c0's (976 steps). c1's best checkpoint (epoch 8)
+  is c0's (epoch 2) exactly, and every check in between was worse. So
+  finer early stopping finds the same minimum: the overfitting after about
+  4 million windows is real, not an artefact of coarse stopping.
+- c7 (90-day window) against c2 (the same with 365 days): validation NSE
+  0.682 against 0.701 at 1 day, 0.308 against 0.309 at 3 days, 0.174
+  against 0.171 at 7 days. The longer memory helps only at 1 day, by about
+  0.02, with one seed. The LSTM's 1-day gap to boosting (which sees 90 days)
+  is therefore not explained by memory length.
+- `run_lstm.py --tuned` retrained the chosen settings, which are the
+  original ones. Training losses and every test score match Experiment 6
+  exactly, so training is repeatable on this machine. No new result.
+
+### B. The LSTM in the wet-to-dry test
+
+`results/table_lstm_wet_to_dry.md` and `results/table_lstm_transfer_cost.csv`
+(167 dry catchments, 3 seeds). On the measure fixed in advance:
+
+| Trained on | Lead | LSTM cost | Boosting cost | Verdict |
+| --- | ---: | ---: | ---: | --- |
+| wetter half | 1 | -0.106 | -0.050 | LSTM transfers worse |
+| wetter half | 3 | -0.076 | -0.007 | LSTM transfers worse |
+| wetter half | 7 | -0.062 | -0.014 | LSTM transfers worse |
+| random half | 1 | -0.004 | -0.015 | LSTM better, by 0.0101, just over the 0.01 margin |
+| random half | 3 | +0.001 | -0.002 | neither |
+| random half | 7 | +0.000 | -0.002 | neither |
+
+The per-seed ranges do not overlap for the wet-trained models at any lead.
+
+- Reading: when the training catchments are like the test catchments, the
+  LSTM transfers as well as boosting or slightly better. When they are all
+  wetter, it loses about 2 to 11 times as much skill (2.1, 10.9 and 4.4
+  times at 1, 3 and 7 days).
+- Low flows: the wet-trained LSTM's low-flow CSI is zero (or undefined) in
+  81%, 92% and 94% of catchment-seed pairs at 1, 3 and 7 days; the
+  wet-trained boosting model's in 26%, 43% and 62%; the seen models' in 6%
+  to 23%. The wet-trained LSTM almost never warns correctly of low flow in
+  the drier catchments.
+- Not tested, only a candidate explanation: the scaler and the catchment
+  descriptors come from wet catchments only, so dry catchments' descriptors
+  (aridity among them) lie outside the training range. Trees hold their
+  last value outside the range; a neural network extrapolates.
+- Limit: the wet-only LSTMs reached their best validation loss in the
+  first sampling epoch in all three seeds, so they had less training than
+  the seen LSTM (best at epoch 1 or 2).
+
+### Mistake found and fixed
+
+The `--wet-to-dry` run also rewrote `results/table_lstm.md`,
+`results/table_lstm.csv` and `results/per_catchment_lstm.csv` without the
+unseen-region rows. The assistant restored them from commit 994e944 (they
+match it exactly) and changed `run_lstm.py` so a wet-to-dry run leaves them
+alone. The transfer-cost table is now written by `run_lstm.py`
+(`transfer_cost`); the table above was produced by that function from the
+saved per-catchment scores, with no retraining. One test added (91 pass).

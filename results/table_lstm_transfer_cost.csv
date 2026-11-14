@@ -1,0 +1,7 @@
+trained_on,lead_days,lstm_cost,lstm_cost_seed_min,lstm_cost_seed_max,boosting_cost,boosting_cost_seed_min,boosting_cost_seed_max,lstm_minus_boosting,share_lstm_loses_less,lstm_transfers
+wet_only,1,-0.1061,-0.1108,-0.0945,-0.0503,-0.051,-0.0473,-0.0558,0.2455,worse
+wet_only,3,-0.0755,-0.0855,-0.067,-0.0068,-0.0076,-0.0064,-0.0687,0.0958,worse
+wet_only,7,-0.0617,-0.0788,-0.052,-0.0145,-0.0219,-0.0112,-0.0472,0.2096,worse
+random_half,1,-0.0044,-0.0064,0.0007,-0.0145,-0.0163,-0.0123,0.0101,0.6627,better
+random_half,3,0.0006,-0.0022,0.0024,-0.0025,-0.0036,-0.0015,0.0031,0.5808,neither
+random_half,7,0.0003,-0.0068,0.0044,-0.002,-0.0027,-0.0004,0.0023,0.5329,neither
