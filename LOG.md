@@ -677,3 +677,78 @@ The review also raised design points (repeated permutations for the leak
 demonstration, nested preprocessing inside the inner tuning folds, missing
 data flags for every input). They are design changes, not corrections, and
 wait for Paul's decision on each logged choice.
+
+## 2026-11-14: decisions on every logged choice (Paul)
+
+Paul reviewed all 40 river choices in a written review dated 14 November
+2026, prepared with help from ChatGPT on reasoning, references and editing.
+His decisions, summarised:
+
+| # | Decision | Reason, in short |
+| --- | --- | --- |
+| A1 | Agree | One weather source for the whole period; a mid-record switch could look like a change in the river. About consistency, not accuracy. |
+| A2 | Agree | Specific discharge is comparable across catchments and shares rainfall's units. |
+| A3 | Agree, with a condition | Workable for a retrospective study. Observation windows that cross day boundaries must be checked before calling it operational. |
+| A4 | Agree | Simple, explainable features; every calculation must stop at the issue time. |
+| A5 | Agree | Describe as "no hyperparameter search"; validation still acts through early stopping. |
+| A6 | Agree | Clipping a negative forecast cannot worsen squared error; record how often it happens. |
+| A7 | Agree | Wrap the window at New Year, training data only, one leap-day rule. |
+| A8 | Agree | A basic safeguard; counts alone do not ensure seasonal or event coverage. |
+| A9 | Agree | Report retained days and each model's availability. |
+| A10 | Agree, with the corrected names | 95th and 10th percentiles; terminology only, thresholds unchanged. |
+| A11 | Agree | Three seeds for the headline model; one-seed reference labelled as such. |
+| A12 | Agree | Keep the raw file; the repair touches only the two known rows. |
+| A13 | Agree | The target date is known in advance; not future weather. |
+| B1 | Agree | Keep the sequence visible: the follow-up came after the first test results. |
+| B2 | Agree | 0.02 is a chosen tolerance, not a standard; report both CSIs and NSE. |
+| B3 | Agree | Compares the models as configured, not each family at its best. |
+| B4 | Agree, with a check | The 35 descriptors need a provenance and dates check; other variables still carry geography. |
+| B5 | Agree | Show the region map and fold sizes; nested catchments can straddle boundaries. |
+| B6 | Agree | Report counts and event coverage; 20% does not give equal examples per catchment. |
+| B7 | Agree | State the ratio, period and direction; two halves simplify a gradient. |
+| B8 | Agree | Label as a later addition; repeated same-size samples would extend it. |
+| B9 | Agree | Keep all seeds and their later addition in the record. |
+| C1 | Agree | Seven levels are not a full distribution. |
+| C2 | Agree | Not shown to suit every quantile. |
+| C3 | Agree | Keep stopping and calibration years separate, same date rules. |
+| C4 | Agree | Errors from permitted data; scored on matching days. |
+| C5 | Agree | Report hit rate and false alarm ratio with CSI; live use needs real costs. |
+| C6 | Change the claim | Not "the only option"; split-conformal relies on exchangeability, which river data do not meet automatically. Report coverage by catchment and lead with width. |
+| C7 | Agree | State plainly that unseen-region warnings were not tested. |
+| C8 | Agree | Small differences not presented as robust across seeds. |
+| E1 | Agree | Score each lead separately; state the loss weighting. |
+| E2 | Agree | Both models get observed flow up to the issue time. |
+| E3 | Agree, with the amendment | Keep 365 days; a matched-history comparison would separate memory from architecture. |
+| E4 | Agree | 256 cells and dropout 0.4 match the paper; the rest is documented as used here. |
+| E5 | Agree, if training converges | Look at learning curves; never pick a batch size by test score. |
+| E6 | Agree | State the scaling rule explicitly. |
+| E7 | Change | Add missing-data flags for any input that can be missing; never impute targets. |
+| E8 | Agree | Record the sampling rule; call it a sampling epoch. |
+| E9 | Agree | Keep individual seed scores as well as the mean. |
+| E10 | Change the interpretation | "Did not exceed the improvement margin", not equivalence; report paired differences. |
+
+### What the code shows for the points the review asked to check
+
+- **B5.** Regions are k-means on British National Grid easting and northing,
+  a projected grid in metres.
+- **C6.** The conformal step uses the finite-sample level
+  ceil((n + 1)(1 - alpha)) / n with the higher order statistic. Each
+  unseen region is calibrated on the calibration days of the other four
+  regions only (`quantile.fit_predict`). Coverage and width are reported
+  pooled and per catchment; by season they are not.
+- **E1.** The loss is the mean squared error over every target that
+  exists, so the three leads have equal weight.
+- **E6.** Scaling is global: one mean and standard deviation per variable
+  from the training years of the training catchments, not per catchment.
+- **E7.** Rain, temperature and PET are never missing in any split (0.0%).
+  Flow is missing on 11.7% of training days, 0.5% of validation days and
+  1.6% of test days, and already has a flag. Missing targets are masked out
+  of the loss and the scores, never filled. The change Paul asked for is
+  therefore already met, and no retraining is needed.
+- **E8.** Catchments and issue days are drawn uniformly with replacement,
+  so a catchment with a short record is drawn as often as one with a long
+  record. The validation sample is fixed (seed 20261114).
+
+Still open from the review: A3 and B4 (observation windows, availability
+and the dates behind descriptors), C6 coverage by season, E3 a
+matched-history LSTM, E5 learning curves.
