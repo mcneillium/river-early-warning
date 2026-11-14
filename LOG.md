@@ -530,3 +530,66 @@ What has been checked:
 | E9 | Seeds 0, 1, 2 | Matches Experiment 3 | More seeds |
 | E10 | "No better" means within 0.01 median NSE of regional boosting, or below | Fixed before the run | A different margin |
 
+## 2026-11-14: Experiment 6, first run (Paul's machine)
+
+Run by Paul on Windows with an NVIDIA RTX 5090, Python 3.14.7 and PyTorch
+2.11.0+cu128, from commit `b684425`. All 91 tests passed there first.
+`python scripts/run_lstm.py`, seeds 0, 1 and 2, all 659 catchments, 38
+seconds per epoch.
+
+| Seed | Epochs run | Best epoch | Validation loss at best |
+| ---: | ---: | ---: | ---: |
+| 0 | 6 | 2 | 0.2846 |
+| 1 | 5 | 1 | 0.2878 |
+| 2 | 6 | 2 | 0.2891 |
+
+Median across catchments on the test years, mean over seeds (standard
+deviation over seeds in brackets):
+
+| Lead | Model | NSE | KGE | High-flow CSI | Low-flow CSI |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 1 | LSTM | 0.734 (0.010) | 0.718 | 0.529 | 0.616 |
+| 1 | persistence | 0.509 | 0.754 | 0.414 | 0.754 |
+| 3 | LSTM | 0.377 (0.003) | 0.389 | 0.131 | 0.317 |
+| 3 | persistence | 0.066 | 0.533 | 0.223 | 0.545 |
+| 7 | LSTM | 0.239 (0.004) | 0.234 | 0.005 | 0.139 |
+| 7 | persistence | -0.235 | 0.385 | 0.138 | 0.389 |
+
+### Against the criteria fixed in the protocol
+
+Regional boosting, same three seeds (`results/table_regional_seeds.csv`):
+median NSE 0.763, 0.375 and 0.235.
+
+| Lead | LSTM minus boosting | Outcome under the 0.01 rule |
+| ---: | ---: | --- |
+| 1 | -0.029 | No better (worse) |
+| 3 | +0.001 | No better |
+| 7 | +0.004 | No better |
+
+A null result at every lead. The warning scores are no better either:
+high-flow CSI 0.529, 0.131, 0.005 against 0.566, 0.134, 0.005 for boosting,
+and low-flow CSI lower at every lead.
+
+### What limits this
+
+- The comparison is across two scoring runs, not on identical days. The
+  boosting forecasts were not on the machine that ran the LSTM. Persistence
+  scores identically to four decimals in both runs (0.5093, 0.0657,
+  -0.2347), which suggests the days are the same. The paired comparison in
+  the protocol is still owed: run weeks 1 and 2 on the same machine, then
+  run `scripts/run_lstm.py` again (trained models are reused).
+- The best epoch was 1 or 2 in every seed. An epoch is a quarter of the
+  training windows, so the model was at its best before seeing most of them
+  once, and overfitted after that. The configuration was fixed in advance
+  and not tuned, as the protocol says. This is weak evidence about LSTMs in
+  general and fair evidence about this one.
+- The 1-day result differs across seeds more than boosting does (standard
+  deviation 0.010 against 0.003).
+- The unseen-region run (`--unseen`) has not been made.
+
+### Not done, on purpose
+
+No setting was changed after seeing these numbers. Any follow-up (a lower
+learning rate, a smaller model, weight decay) would be chosen on validation
+years only, written as a dated amendment first, and labelled exploratory.
+

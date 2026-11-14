@@ -3,7 +3,8 @@
 **Status:** done so far: data, metrics and baselines (week 1); the baseline
 repair and the unseen-region experiment with a regional boosting model
 (week 2); quantile forecasts, conformal calibration and quantile-based
-warnings (Experiment 5). The regional LSTM is written and tested but not yet run (it needs a GPU).
+warnings (Experiment 5). The regional LSTM (Experiment 6) has had its first run: it is no better than
+regional boosting at any lead time. A like-for-like rescoring is still owed.
 Still to come: gaps in the inputs, explanations. A first report is in
 `docs/report.md`.
 
@@ -86,7 +87,8 @@ The baseline run is resumable: forecasts are saved per catchment under
 
 ### Experiment 6: the regional LSTM (needs a GPU)
 
-Not yet run. Protocol: `docs/protocol_week4.md`.
+Protocol: `docs/protocol_week4.md`. First run: 14 November 2026, about 11
+minutes for three seeds on an RTX 5090.
 
 ```bash
 # PyTorch built for CUDA 12.8. RTX 50-series cards need this build or newer.
@@ -128,6 +130,26 @@ Experiment 5 tables and figures:
 - `table_interval_coverage.md`: how honest the 90% range is, seen and unseen
 - `table_quantile_reliability.csv`, `quantile_tau_choice.json`
 - `figures/warnings_by_lead.png`, `figures/interval_coverage.png`
+
+### Experiment 6: a regional LSTM (first run)
+
+Median NSE on the test years, mean of three seeds.
+
+| Model | 1 day | 3 days | 7 days |
+| --- | ---: | ---: | ---: |
+| Regional boosting (Experiment 3) | 0.763 | 0.375 | 0.235 |
+| Regional LSTM | 0.734 | 0.377 | 0.239 |
+
+- Against the rule fixed in the protocol (within 0.01, or below, means "no
+  better"), the LSTM is no better at any lead, and is worse at 1 day.
+- As a warning system it fails in the same way: high-flow CSI at 7 days is
+  0.005 for both models.
+- The two rows come from separate scoring runs. Persistence scores the same
+  to four decimals in both, so the days almost certainly match, but the
+  paired comparison on identical days has not been made yet.
+- Validation loss was lowest after 1 or 2 epochs in every seed and rose
+  afterwards, so this fixed configuration overfits early. A tuned LSTM
+  could do better. Nothing was tuned, and nothing was chosen on test years.
 
 ## Where things are
 
