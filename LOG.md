@@ -622,3 +622,33 @@ the limits recorded this morning (no paired comparison) is now closed. The
 others stand: one untuned configuration that overfits within two short
 epochs, and no unseen-region run.
 
+## 2026-11-14: Experiment 6, unseen regions (Paul's machine)
+
+`python scripts/run_lstm.py --unseen` on the RTX 5090: 15 more trainings
+(five regions held out in turn, seeds 0, 1, 2), 38 to 41 seconds per epoch,
+best validation loss after 1 or 2 epochs every time, as before. The three
+seen-catchment models were reused, and their scores are unchanged to the
+last digit. `scripts/summarise_lstm.py` writes the paired table
+(`results/table_lstm_paired.md`).
+
+Median NSE, mean over seeds:
+
+| Lead | LSTM, unseen | Boosting, unseen | Paired median difference | LSTM better in |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.708 | 0.723 | -0.010 | 36% |
+| 3 | 0.367 | 0.367 | +0.004 | 59% |
+| 7 | 0.225 | 0.224 | +0.005 | 59% |
+
+Under the 0.01 rule fixed in the protocol, the LSTM is no better on unseen
+regions at any lead. Low-flow CSI is lower at every lead (0.601 against
+0.706 at 1 day), as on seen catchments.
+
+**Exploratory, not set in advance.** The cost of holding a region out, per
+catchment, at 1 day: -0.009 for the LSTM and -0.019 for boosting. At 3 and
+7 days both lose under 0.01. Seed 1's seen LSTM was the weakest (best after
+one epoch), which makes its own held-out cost look small (+0.001), so the
+1-day contrast is partly an artefact of that seed. Not a claim.
+
+What remains: one untuned configuration; the overfitting within two short
+epochs; no LSTM in the wet-to-dry test.
+

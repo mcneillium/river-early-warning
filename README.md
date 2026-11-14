@@ -4,7 +4,7 @@
 repair and the unseen-region experiment with a regional boosting model
 (week 2); quantile forecasts, conformal calibration and quantile-based
 warnings (Experiment 5). The regional LSTM (Experiment 6) is no better than regional boosting at any
-lead time, scored on identical days. Weeks 1 and 2 and Experiment 3 have been
+lead time, on seen catchments or on unseen regions, scored on identical days. Weeks 1 and 2 and Experiment 3 have been
 re-run on a second machine (`results/reproduction_second_machine.md`).
 Still to come: gaps in the inputs, explanations. A first report is in
 `docs/report.md`.
@@ -150,6 +150,14 @@ same days (`results/table_lstm.md`).
   0.005 for the LSTM and 0.002 for boosting.
 - The limit found in Experiment 1 looks like a limit of the information
   (no future weather), not of boosting.
+- **Unseen regions** (each region forecast by a model that never saw it):
+  median NSE 0.708, 0.367 and 0.225 for the LSTM against 0.723, 0.367 and
+  0.224 for boosting. No better at any lead under the same rule.
+  Per catchment, the LSTM lost less than boosting at 1 day when a region
+  was held out (median -0.009 against -0.019). That comparison was not set
+  in advance, so treat it as exploratory. Part of it comes from one weak
+  seen-catchment LSTM (seed 1, best after a single epoch).
+  Details: `results/table_lstm_paired.md`.
 - Validation loss was lowest after 1 or 2 epochs in every seed and rose
   afterwards, so this fixed configuration overfits early. A tuned LSTM
   could do better. Nothing was tuned, and nothing was chosen on test years.
