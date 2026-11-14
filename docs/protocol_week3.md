@@ -95,3 +95,19 @@ fold, which is too costly here.
 - Coverage well below 90% on the test years even after the conformal step:
   then the calibration years are not representative of the test years, which
   would itself be a finding about distribution shift.
+
+## Amendment 1, 14 November 2026 (after the results; changes no setting)
+
+Experiment 5 was run with one model seed. It is repeated with model seeds
+1 and 2 (`scripts/run_quantiles.py --seed N`, then
+`scripts/score_quantiles.py --seed N`), with the same row sample, the same
+settings and the same tree limit. Seed 0 is also re-run on a second machine.
+
+- Seeds 1 and 2 are scored against the regional point model of the same seed
+  (`results/raw_regional_seedN/`).
+- What is reported: each finding of Experiment 5 per seed, and whether it
+  holds in all three. A finding that does not hold in all three seeds is
+  described as not robust to the model seed.
+- The tree limit (1,000) is kept, so the 12 models that reached it in the
+  first run may reach it again. How many do, per seed, is reported from the
+  saved tree counts. Raising the limit would be a further amendment.

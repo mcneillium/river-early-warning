@@ -3,8 +3,10 @@
     python scripts/run_lstm.py                 three seeds, all catchments
     python scripts/run_lstm.py --unseen        also hold out each region in turn
     python scripts/run_lstm.py --smoke         a two-minute check on a CPU
+    python scripts/run_lstm.py --wet-to-dry    train on wet catchments, forecast dry ones
+    python scripts/run_lstm.py --tuned         use the settings chosen by scripts/tune_lstm.py
 
-Protocol: docs/protocol_week4.md. Each trained model's forecasts are saved
+Protocol: docs/protocol_week4.md (amendment 2 covers --tuned and --wet-to-dry). Each trained model's forecasts are saved
 under results/raw_lstm/, and a finished model is not trained again, so the
 script can be stopped and restarted.
 """
@@ -43,7 +45,7 @@ def fit_and_forecast(panel, train_gauges, predict_gauges, settings, seed, device
     tensors = lstm.to_tensors(panel, scaler, device)
     log(f"{out_path.name}: training on {len(train_gauges)} catchments, seed {seed}")
     model, history = lstm.train(panel, tensors, train_index, settings, seed, log)
-    forecast = lstm.predict(panel, tensors, scaler, model, panel.index_of(predict_gauges))
+    forecast = lstm.predict(panel, tensors, scaler, model, panel.index_of(predict_gauges), window=settings.window)
     temporary = out_path.with_suffix(".tmp")
     forecast.to_parquet(temporary, index=False)
     temporary.replace(out_path)
@@ -90,12 +92,53 @@ def load_boosting(results: Path, seed: int, name: str) -> pd.DataFrame | None:
     return pd.concat(parts, ignore_index=True)
 
 
+def wet_dry_split(attributes: pd.DataFrame, gauges: list[str]) -> tuple[list[str], list[str], list[str], list[str]]:
+    """The wet-to-dry split of scripts/run_regional.py, rebuilt the same way.
+
+    Returns wet, dry, the fixed random half (control) and the dry catchments
+    outside that half, which are the catchments every model is scored on.
+    """
+    aridity = attributes.set_index("gauge_id").loc[gauges, "aridity"].astype(float)
+    wet = list(aridity.index[aridity < aridity.median()])
+    dry = list(aridity.index[aridity >= aridity.median()])
+    half = list(np.random.default_rng(0).choice(sorted(gauges), size=len(wet), replace=False))
+    dry_control = [g for g in dry if g not in set(half)]
+    return wet, dry, half, dry_control
+
+
+def write_tables(per_catchment: pd.DataFrame, seeds, prefix: str, reference: str, out_csv: Path, out_md: Path,
+                 per_catchment_csv: Path, title: str) -> None:
+    per_catchment.to_csv(per_catchment_csv, index=False)
+    by_seed = per_catchment.groupby(["model", "lead_days", "seed"])[SCORE_COLUMNS].median()
+    table = by_seed.groupby(["model", "lead_days"]).agg(["mean", "std"]).round(4)
+    table.columns = [f"{column}_{stat}" for column, stat in table.columns]
+    table.reset_index().to_csv(out_csv, index=False)
+    lines = [f"{title} Median across catchments on the test years, then the mean over seeds "
+             f"(seeds {list(seeds)}). All models in a row group are scored on the same days.", ""]
+    lines += ["| Lead | Model | NSE | KGE | High-flow CSI | Low-flow CSI |", "| ---: | --- | ---: | ---: | ---: | ---: |"]
+    for (model, lead), row in table.reset_index().set_index(["model", "lead_days"]).sort_index(level=1).iterrows():
+        lines.append(f"| {lead} | {model} | {row['nse_mean']:.3f} | {row['kge_mean']:.3f} | "
+                     f"{row['high_csi_mean']:.3f} | {row['low_csi_mean']:.3f} |")
+    models = set(per_catchment["model"])
+    if reference in models and prefix in models:
+        wide = per_catchment.pivot_table(index=["seed", "lead_days", "gauge_id"], columns="model", values="nse")
+        gap = (wide[prefix] - wide[reference]).groupby("lead_days")
+        lines += ["", f"{prefix} minus {reference}, NSE per catchment (all seeds pooled):", "",
+                  f"| Lead | Median difference | Share of catchments where {prefix} is better |", "| ---: | ---: | ---: |"]
+        for lead, values in gap:
+            lines.append(f"| {lead} | {values.median():+.3f} | {100 * (values > 0).mean():.0f}% |")
+    out_md.write_text("\n".join(lines) + "\n")
+    print("\n".join(lines), flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--data", type=Path, default=ROOT / "data")
     parser.add_argument("--results", type=Path, default=ROOT / "results")
     parser.add_argument("--seeds", type=int, nargs="*", default=[0, 1, 2])
     parser.add_argument("--unseen", action="store_true", help="also hold out each region in turn")
+    parser.add_argument("--wet-to-dry", action="store_true", help="also train on wet catchments, forecast dry ones")
+    parser.add_argument("--tuned", action="store_true", help="settings from results/lstm_tuning_choice.json")
     parser.add_argument("--smoke", action="store_true", help="tiny run to check the code, not a result")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -104,11 +147,18 @@ def main() -> None:
     config = config_from_splits(saved)
     gauges = sorted(saved["gauge_ids"])
     settings = lstm.Settings()
-    tag = ""
+    tag, prefix = "", "lstm"
+    if args.tuned:
+        choice_path = args.results / "lstm_tuning_choice.json"
+        if not choice_path.exists():
+            sys.exit("results/lstm_tuning_choice.json not found. Run scripts/tune_lstm.py first.")
+        settings = lstm.Settings(**json.loads(choice_path.read_text())["settings"])
+        tag, prefix = "_tuned", "lstm_tuned"
     if args.smoke:
         gauges = gauges[:: max(1, len(gauges) // 12)][:12]
-        settings = lstm.Settings(hidden=16, batch=128, epochs=2, windows_per_epoch=2048, validation_fraction=0.01)
-        args.seeds, tag = [0], "_smoke"
+        settings = lstm.Settings(hidden=16, batch=128, epochs=2, windows_per_epoch=2048, validation_fraction=0.01,
+                                 window=settings.window)
+        args.seeds, tag = [0], tag + "_smoke"
     elif args.device == "cpu":
         sys.exit("No GPU found. Use --smoke to check the code, or see README for the PyTorch install.")
     print(f"device {args.device}; {len(gauges)} catchments; seeds {args.seeds}; {settings}", flush=True)
@@ -128,10 +178,19 @@ def main() -> None:
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     folds = load_folds(ROOT / "splits" / "spatial_folds_v1.json") if args.unseen else {}
-    all_scores = []
+    wet, dry, half, dry_control = wet_dry_split(attributes, gauges)
+    if args.wet_to_dry:
+        print(f"wet-to-dry: {len(wet)} wet, {len(dry)} dry, control half {len(half)}, "
+              f"scored on {len(dry_control)} dry catchments outside the half", flush=True)
+    all_scores, dry_scores = [], []
     for seed in args.seeds:
-        forecasts = {"lstm_seen": fit_and_forecast(
-            panel, gauges, gauges, settings, seed, args.device, raw_dir / f"seed{seed}_seen.parquet", print)}
+        seen = fit_and_forecast(panel, gauges, gauges, settings, seed, args.device,
+                                raw_dir / f"seed{seed}_seen.parquet", print)
+        forecasts = {f"{prefix}_seen": seen}
+        if args.tuned and not args.smoke:
+            original = args.results / "raw_lstm" / f"seed{seed}_seen.parquet"
+            if original.exists():
+                forecasts["lstm_seen"] = pd.read_parquet(original)
         if args.unseen:
             parts = []
             for fold in sorted(set(folds.values())):
@@ -140,7 +199,7 @@ def main() -> None:
                 parts.append(fit_and_forecast(
                     panel, kept, held_out, settings, seed, args.device,
                     raw_dir / f"seed{seed}_unseen_region{fold}.parquet", print))
-            forecasts["lstm_unseen"] = pd.concat(parts, ignore_index=True)
+            forecasts[f"{prefix}_unseen"] = pd.concat(parts, ignore_index=True)
         for name in ("regional_seen", "regional_unseen"):
             boosting = None if args.smoke else load_boosting(args.results, seed, name)
             if boosting is not None and (name == "regional_seen" or args.unseen):
@@ -152,28 +211,37 @@ def main() -> None:
         scores.insert(0, "seed", seed)
         all_scores.append(scores)
 
-    per_catchment = pd.concat(all_scores, ignore_index=True)
-    per_catchment.to_csv(args.results / f"per_catchment_lstm{tag}.csv", index=False)
-    by_seed = per_catchment.groupby(["model", "lead_days", "seed"])[SCORE_COLUMNS].median()
-    table = by_seed.groupby(["model", "lead_days"]).agg(["mean", "std"]).round(4)
-    table.columns = [f"{column}_{stat}" for column, stat in table.columns]
-    table.reset_index().to_csv(args.results / f"table_lstm{tag}.csv", index=False)
+        if args.wet_to_dry:
+            dry_forecasts = {
+                f"{prefix}_seen": seen,
+                f"{prefix}_wet_only": fit_and_forecast(panel, wet, dry_control, settings, seed, args.device,
+                                                       raw_dir / f"seed{seed}_wet_only.parquet", print),
+                f"{prefix}_random_half": fit_and_forecast(panel, half, dry_control, settings, seed, args.device,
+                                                          raw_dir / f"seed{seed}_random_half.parquet", print),
+            }
+            for name in ("regional_seen", "regional_wet_only", "regional_random_half"):
+                boosting = None if args.smoke else load_boosting(args.results, seed, name)
+                if boosting is not None:
+                    # run_regional.py forecasts every dry catchment from the wet model and the dry
+                    # catchments outside the half from the control. Check the rebuilt split agrees.
+                    expected = {"regional_wet_only": set(dry), "regional_random_half": set(dry_control)}.get(name)
+                    if expected is not None and set(boosting["gauge_id"]) != expected:
+                        raise AssertionError(f"{name}: boosting forecasts cover different catchments than the "
+                                             "rebuilt wet-to-dry split")
+                    dry_forecasts[name] = boosting
+            dry_block = score(dry_forecasts, frames, config, dry_control)
+            dry_block.insert(0, "seed", seed)
+            dry_scores.append(dry_block)
 
-    lines = ["Median across catchments on the test years, then the mean over seeds "
-             f"(seeds {args.seeds}). All models in a row group are scored on the same days.", ""]
-    lines += ["| Lead | Model | NSE | KGE | High-flow CSI | Low-flow CSI |", "| ---: | --- | ---: | ---: | ---: | ---: |"]
-    for (model, lead), row in table.reset_index().set_index(["model", "lead_days"]).sort_index(level=1).iterrows():
-        lines.append(f"| {lead} | {model} | {row['nse_mean']:.3f} | {row['kge_mean']:.3f} | "
-                     f"{row['high_csi_mean']:.3f} | {row['low_csi_mean']:.3f} |")
-    if "regional_seen" in set(per_catchment["model"]):
-        wide = per_catchment.pivot_table(index=["seed", "lead_days", "gauge_id"], columns="model", values="nse")
-        gap = (wide["lstm_seen"] - wide["regional_seen"]).groupby("lead_days")
-        lines += ["", "LSTM minus regional boosting, NSE per catchment (all seeds pooled):", "",
-                  "| Lead | Median difference | Share of catchments where the LSTM is better |", "| ---: | ---: | ---: |"]
-        for lead, values in gap:
-            lines.append(f"| {lead} | {values.median():+.3f} | {100 * (values > 0).mean():.0f}% |")
-    (args.results / f"table_lstm{tag}.md").write_text("\n".join(lines) + "\n")
-    print("\n".join(lines), flush=True)
+    write_tables(pd.concat(all_scores, ignore_index=True), args.seeds, f"{prefix}_seen",
+                 "regional_seen", args.results / f"table_lstm{tag}.csv", args.results / f"table_lstm{tag}.md",
+                 args.results / f"per_catchment_lstm{tag}.csv", "Experiment 6.")
+    if args.wet_to_dry:
+        write_tables(pd.concat(dry_scores, ignore_index=True), args.seeds, f"{prefix}_wet_only",
+                     "regional_wet_only", args.results / f"table_lstm_wet_to_dry{tag}.csv",
+                     args.results / f"table_lstm_wet_to_dry{tag}.md",
+                     args.results / f"per_catchment_lstm_wet_to_dry{tag}.csv",
+                     f"Wet-to-dry test, scored on the {len(dry_control)} dry catchments outside the control half.")
 
 
 if __name__ == "__main__":

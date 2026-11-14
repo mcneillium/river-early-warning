@@ -111,9 +111,12 @@ def csi_only(event: np.ndarray, forecast: np.ndarray) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--leads", type=int, nargs="*", default=list(LEAD_DAYS))
-    leads = parser.parse_args().leads
+    parser.add_argument("--seed", type=int, default=0, help="score the quantile models of this seed")
+    parsed = parser.parse_args()
+    leads, seed = parsed.leads, parsed.seed
+    tag = "" if seed == 0 else f"_seed{seed}"
     results = ROOT / "results"
-    raw_dir = results / "raw_quantiles"
+    raw_dir = results / f"raw_quantiles{tag}"
     saved = load_splits(ROOT / "splits" / "splits_v1.json")
     config = config_from_splits(saved)
     gauges = saved["gauge_ids"]
@@ -145,7 +148,7 @@ def main() -> None:
         band_columns = [f"band_{name}" for name in Q_COLUMNS]
         seen[band_columns] = band
 
-        point = pd.read_parquet(results / "raw_regional" / f"lead{lead}_regional_seen.parquet").rename(
+        point = pd.read_parquet(results / f"raw_regional{tag}" / f"lead{lead}_regional_seen.parquet").rename(
             columns={"forecast": "regional_point"}
         )
         seen = seen.merge(point, on=["gauge_id", "date"], how="left")
@@ -261,7 +264,7 @@ def main() -> None:
         gc.collect()
 
     per_catchment = pd.DataFrame(catchment_rows)
-    per_catchment.to_csv(results / "per_catchment_quantile.csv", index=False)
+    per_catchment.to_csv(results / f"per_catchment_quantile{tag}.csv", index=False)
     grouped = per_catchment.groupby(["lead_days", "model"], observed=True)
     warnings_table = grouped[WARNING_METRICS].median()
     warnings_table["warnings_per_event_high"] = grouped.apply(
@@ -270,11 +273,11 @@ def main() -> None:
         lambda g: g["low_warnings"].sum() / max(g["low_events"].sum(), 1), include_groups=False)
     warnings_table["n_catchments"] = grouped["gauge_id"].nunique()
     warnings_table = warnings_table.reset_index()
-    warnings_table.to_csv(results / "table_quantile_warnings.csv", index=False)
+    warnings_table.to_csv(results / f"table_quantile_warnings{tag}.csv", index=False)
     intervals = pd.DataFrame(interval_rows)
-    intervals.to_csv(results / "table_interval_coverage.csv", index=False)
-    pd.DataFrame(reliability_rows).to_csv(results / "table_quantile_reliability.csv", index=False)
-    (results / "quantile_tau_choice.json").write_text(json.dumps(choice, indent=1))
+    intervals.to_csv(results / f"table_interval_coverage{tag}.csv", index=False)
+    pd.DataFrame(reliability_rows).to_csv(results / f"table_quantile_reliability{tag}.csv", index=False)
+    (results / f"quantile_tau_choice{tag}.json").write_text(json.dumps(choice, indent=1))
 
     order = ["persistence", "regional_point", "persistence_band", "quantile_model"]
     lines = ["Median across catchments, test period (water years 2013 to 2022). No future weather.",
@@ -295,7 +298,7 @@ def main() -> None:
             lines.append(f"| {model} | " + " | ".join(
                 "" if pd.isna(row[m]) else f"{row[m]:.3f}" for m in WARNING_METRICS) + " |")
         lines.append("")
-    (results / "table_quantile_warnings.md").write_text("\n".join(lines))
+    (results / f"table_quantile_warnings{tag}.md").write_text("\n".join(lines))
 
     lines = ["The 90% range (0.05 to 0.95 quantile) on the test period. Target coverage: 0.90.",
              "`conformal` = after the calibration step, which uses 2009 to 2012 only.",
@@ -308,7 +311,7 @@ def main() -> None:
             f"{row['coverage_median_catchment']:.3f} | {row['coverage_5th_percentile_catchment']:.3f} to "
             f"{row['coverage_95th_percentile_catchment']:.3f} | {100 * row['share_catchments_below_80pct']:.0f}% | "
             f"{row['median_width_mm_day']:.3f} |")
-    (results / "table_interval_coverage.md").write_text("\n".join(lines) + "\n")
+    (results / f"table_interval_coverage{tag}.md").write_text("\n".join(lines) + "\n")
     print("Tables written", flush=True)
 
 

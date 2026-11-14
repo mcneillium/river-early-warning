@@ -108,3 +108,68 @@ Kratzert et al. (2019)" should not be read as covering it.
 Interpretation of the 0.01 rule: a result inside the margin means the LSTM
 did not exceed the predefined improvement margin. It does not show that the
 two models are equivalent.
+
+## Amendment 2, 14 November 2026 (before these runs; after Experiment 6's results were seen)
+
+Two follow-ups. Both were planned after the Experiment 6 test results
+existed, so they are exploratory and are reported as such. Neither changes
+any result already reported.
+
+### A. Settings chosen on the validation years (`scripts/tune_lstm.py`)
+
+Why: in every Experiment 6 run the best validation loss came at sampling
+epoch 1 or 2 (of 2,000,000 windows each) and rose after that, so early
+stopping acted late and coarsely. Review item E5 asked for learning curves;
+item E3 asked for a matched-history comparison.
+
+Eight candidates, fixed now, each trained once with seed 0 on every
+catchment:
+
+| Candidate | Change from Experiment 6 |
+| --- | --- |
+| c0_original | none (the Experiment 6 settings) |
+| c1_fine_stopping | sampling epochs of 500,000 windows, up to 60, patience 6 |
+| c2_lr3e-4 | c1, learning rate 0.0003 |
+| c3_lr1e-4 | c1, learning rate 0.0001 |
+| c4_hidden128 | c2, hidden size 128 |
+| c5_hidden64 | c2, hidden size 64 |
+| c6_weight_decay | c2, AdamW with weight decay 0.01 |
+| c7_window90 | c2, a 90-day window, the history the boosting model sees (item E3) |
+
+- **Selection rule:** the highest median NSE across catchments on the
+  validation years (2005 to 2012), averaged over leads 1, 3 and 7; a tie
+  (to 4 decimals) goes to the lower validation loss. The same validation
+  years also drive early stopping, through the fixed 20% sample. The test
+  years are not read by the tuning script.
+- **Then:** the chosen settings are trained with seeds 0, 1 and 2 and scored
+  on the test years (`run_lstm.py --tuned`), beside the original LSTM and the
+  regional boosting model on identical days, with the same 0.01 rule as
+  above.
+- **c7 is reported whatever is chosen.** Its validation score against c2
+  separates memory length from the model class, which is the limit stated
+  in advance above.
+- Limits: one seed per candidate; a small grid; boosting is not tuned to the
+  same degree, so a gain for the tuned LSTM is not a fair contest win.
+
+### B. The LSTM in the wet-to-dry test (`run_lstm.py --wet-to-dry`)
+
+The split is the one in Experiment 3 (`scripts/run_regional.py`), rebuilt
+the same way and checked against the boosting forecasts at run time: 328
+wetter catchments (aridity below the median) and 331 drier ones; a control
+of 328 catchments drawn at random (seed 0); scoring on the 167 dry
+catchments outside the control half.
+
+Per seed, two more LSTMs with the Experiment 6 settings: trained on the wet
+half (`lstm_wet_only`) and on the random half (`lstm_random_half`), both
+forecasting the 167 catchments. They are scored beside the seen LSTM and
+the three boosting models on identical days.
+
+- **Question:** does the LSTM lose more or less skill than boosting when it
+  has seen only wetter catchments?
+- **Measure, fixed now:** the cost of transfer per catchment is NSE of the
+  wet-only model minus NSE of the seen model, for each family. The LSTM
+  "transfers better" at a lead if the median of its cost is smaller than
+  boosting's by more than 0.01, and "worse" if larger by more than 0.01;
+  otherwise neither. The random-half control is read the same way.
+- If `--tuned` is also given, the same test is run with the tuned settings
+  and reported separately.

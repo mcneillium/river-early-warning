@@ -110,9 +110,9 @@ def split_mask(panel: Panel, split: str) -> np.ndarray:
     return np.pad(panel.split == split, (0, max(LEADS)), constant_values=False)
 
 
-def issue_days(panel: Panel, split: str) -> np.ndarray:
+def issue_days(panel: Panel, split: str, window: int = WINDOW) -> np.ndarray:
     """Issue days t whose window fits and with at least one target date in `split`."""
-    days = np.arange(WINDOW - 1, len(panel.dates) - min(LEADS))
+    days = np.arange(window - 1, len(panel.dates) - min(LEADS))
     in_split = split_mask(panel, split)
     wanted = np.zeros(len(days), dtype=bool)
     for lead in LEADS:
@@ -120,9 +120,9 @@ def issue_days(panel: Panel, split: str) -> np.ndarray:
     return days[wanted]
 
 
-def cut_windows(tensors: Tensors, catchment: torch.Tensor, day: torch.Tensor) -> torch.Tensor:
-    """The WINDOW days ending on each issue day. Nothing after the issue day."""
-    offsets = torch.arange(-WINDOW + 1, 1, device=day.device)
+def cut_windows(tensors: Tensors, catchment: torch.Tensor, day: torch.Tensor, window: int = WINDOW) -> torch.Tensor:
+    """The `window` days ending on each issue day. Nothing after the issue day."""
+    offsets = torch.arange(-window + 1, 1, device=day.device)
     return tensors.x[catchment[:, None], day[:, None] + offsets]
 
 
@@ -167,6 +167,8 @@ class Settings:
     windows_per_epoch: int = 2_000_000
     patience: int = 4
     validation_fraction: float = 0.2
+    window: int = WINDOW  # days of history; 365 in Experiment 6
+    weight_decay: float = 0.0  # 0 keeps plain Adam, as in Experiment 6; above 0 uses AdamW
 
 
 def train(
@@ -184,8 +186,8 @@ def train(
 
     in_train = torch.from_numpy(split_mask(panel, "train")).to(device)
     in_valid = torch.from_numpy(split_mask(panel, "validation")).to(device)
-    train_days = issue_days(panel, "train")
-    valid_days = issue_days(panel, "validation")
+    train_days = issue_days(panel, "train", settings.window)
+    valid_days = issue_days(panel, "validation", settings.window)
 
     # The validation sample is fixed and does not depend on the model seed.
     valid_rng = np.random.default_rng(20261114)
@@ -194,7 +196,10 @@ def train(
     valid_d = torch.from_numpy(valid_rng.choice(valid_days, n_valid)).to(device)
 
     model = FlowLSTM(tensors.x.shape[-1], tensors.static.shape[-1], settings.hidden, settings.dropout).to(device)
-    optimiser = torch.optim.Adam(model.parameters(), lr=settings.learning_rate)
+    if settings.weight_decay > 0:
+        optimiser = torch.optim.AdamW(model.parameters(), lr=settings.learning_rate, weight_decay=settings.weight_decay)
+    else:
+        optimiser = torch.optim.Adam(model.parameters(), lr=settings.learning_rate)
 
     def validation_loss() -> float:
         model.eval()
@@ -203,7 +208,7 @@ def train(
             for start in range(0, n_valid, settings.batch * 4):
                 c, d = valid_c[start : start + settings.batch * 4], valid_d[start : start + settings.batch * 4]
                 y, mask = cut_targets(tensors, in_valid, c, d)
-                prediction = model(cut_windows(tensors, c, d), tensors.static[c])
+                prediction = model(cut_windows(tensors, c, d, settings.window), tensors.static[c])
                 total += float(((prediction - y) ** 2 * mask).sum())
                 count += int(mask.sum())
         return total / max(count, 1)
@@ -218,7 +223,7 @@ def train(
             c = torch.from_numpy(rng.choice(train_catchments, settings.batch)).to(device)
             d = torch.from_numpy(rng.choice(train_days, settings.batch)).to(device)
             y, mask = cut_targets(tensors, in_train, c, d)
-            loss = masked_mse(model(cut_windows(tensors, c, d), tensors.static[c]), y, mask)
+            loss = masked_mse(model(cut_windows(tensors, c, d, settings.window), tensors.static[c]), y, mask)
             optimiser.zero_grad(set_to_none=True)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -248,13 +253,14 @@ def predict(
     catchments: np.ndarray,
     split: str = "test",
     batch: int = 8192,
+    window: int = WINDOW,
 ) -> pd.DataFrame:
     """Forecasts in mm/day for every target date in `split`.
 
     Returns gauge_id, date (the target date), lead_days, forecast.
     """
     device = tensors.x.device
-    days = issue_days(panel, split)
+    days = issue_days(panel, split, window)
     in_split = split_mask(panel, split)
     model.eval()
     blocks = []
@@ -264,7 +270,7 @@ def predict(
             for start in range(0, len(days), batch):
                 d = torch.from_numpy(days[start : start + batch]).to(device)
                 c = torch.full_like(d, int(catchment))
-                outputs.append(model(cut_windows(tensors, c, d), tensors.static[c]).float().cpu().numpy())
+                outputs.append(model(cut_windows(tensors, c, d, window), tensors.static[c]).float().cpu().numpy())
             scaled = np.concatenate(outputs)
             log_flow = scaled * scaler.dynamic_std[FLOW] + scaler.dynamic_mean[FLOW]
             flow = np.clip(np.expm1(log_flow), 0.0, None)

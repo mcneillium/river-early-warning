@@ -107,6 +107,31 @@ second value must be `True`. Run `scripts/run_regional.py` first if
 regional boosting model on identical days. Finished models are not trained
 again, so the script can be stopped and restarted.
 
+Follow-ups (protocol amendment 2, not yet run):
+
+```bash
+python scripts/tune_lstm.py                 # eight settings, chosen on validation years only
+python scripts/run_lstm.py --tuned          # the chosen settings, three seeds, test years
+python scripts/run_lstm.py --wet-to-dry     # train on wetter catchments, forecast drier ones
+```
+
+Experiment 5 with more model seeds (protocol_week3.md, amendment 1; CPU):
+
+```bash
+python scripts/run_quantiles.py --seed 1 && python scripts/score_quantiles.py --seed 1
+```
+
+### Experiment 7: a foundation model with no training (needs a GPU; not yet run)
+
+Protocol: `docs/protocol_week5.md`. The question and prediction must be
+written there first; the script will not run until they are.
+
+```bash
+pip install -e ".[foundation]"
+python scripts/run_foundation.py --smoke   # a minute on a CPU, not a result
+python scripts/run_foundation.py           # all catchments, test years
+```
+
 ## Results
 
 Week 1 tables are in `results/`:

@@ -752,3 +752,56 @@ His decisions, summarised:
 Still open from the review: A3 and B4 (observation windows, availability
 and the dates behind descriptors), C6 coverage by season, E3 a
 matched-history LSTM, E5 learning curves.
+
+## 2026-11-14 (evening): follow-ups written, not yet run
+
+Written by the assistant at Paul's request; nothing below has been run on a
+GPU yet. Protocols were amended first (`docs/protocol_week4.md` amendment 2,
+`docs/protocol_week3.md` amendment 1).
+
+- `src/rew/lstm.py`: two new settings, `window` (default 365) and
+  `weight_decay` (default 0, which keeps plain Adam). With the defaults the
+  model and training are unchanged; a test pins the Experiment 6 defaults.
+- `scripts/tune_lstm.py`: eight candidates, chosen on validation-year NSE.
+- `scripts/run_lstm.py`: `--tuned` and `--wet-to-dry`. The wet/dry split is
+  rebuilt as in `run_regional.py` and checked against the boosting files
+  (328 wet, 331 dry, 167 scored; both checks pass on the real data).
+- `scripts/run_quantiles.py` and `scripts/score_quantiles.py`: `--seed`.
+- Checks: 90 tests pass on CPU here (6 skipped: they need files not copied over). The scoring path of `--wet-to-dry` was run
+  with the boosting forecasts standing in for the LSTM; it reproduces the
+  Experiment 3 wet-to-dry table (seed 0) exactly.
+
+### Choices made by the assistant, for Paul to confirm or change
+
+| # | Choice | Why |
+| --- | --- | --- |
+| F1 | Eight candidates (see amendment 2) | Small enough for an evening on one GPU; covers stopping, learning rate, size, regularisation and memory |
+| F2 | Select on median validation NSE averaged over leads | The reported score is NSE; the loss is on log flow |
+| F3 | Seed 0 only during selection | Cost; the chosen settings get three seeds on the test years |
+| F4 | Weight decay 0.01 with AdamW | A common AdamW default; not searched |
+| F5 | Sampling epochs of 500,000 windows, patience 6 | Lets early stopping act about four times as often |
+| F6 | The LSTM wet-only and control models forecast only the 167 scored catchments | Saves time; the boosting wet-only model forecasts all 331 dry ones, scored on the same 167 |
+| F7 | Transfer measured as wet-only minus seen, per catchment, 0.01 margin | Matches the 0.01 rule used elsewhere |
+| F8 | Experiment 5 seeds keep the 1,000-tree limit | One change at a time; tree counts are reported |
+
+## 2026-11-14 (late evening): Experiment 7 drafted, not run
+
+Written by the assistant. `docs/protocol_week5.md` (with the question and
+prediction left for Paul), `scripts/run_foundation.py`, one test, and a
+`foundation` extra in `pyproject.toml` (chronos-forecasting 2.3).
+
+- Checked on CPU: Chronos-2 loads from Hugging Face, accepts gaps in the
+  flow history, and the smoke run (3 catchments, 60 issue days) scores end
+  to end. A spot check of one catchment shows the 1-day forecast tracks the
+  previous day's flow, so dates are aligned.
+- Hourly files checked: 671 files, about 10.6 GB, 1990 to 2022. Hourly rain
+  from CEH-GEAR1hr ends on 31 December 2016; GRaD-GB runs from 2006 to 2022.
+
+| # | Choice | Why |
+| --- | --- | --- |
+| G1 | Chronos-2 only, for now | The one model whose install and API were checked today |
+| G2 | 365-day context | The same history as the LSTM |
+| G3 | Raw flow in mm/day, not log flow | How a user would call it; the alternative is a later amendment |
+| G4 | Median as the point forecast; 0.05 and 0.95 for a 90% range | Matches Experiment 5's interval |
+| G5 | Compared with seed 0 of the trained models | The foundation model has no seed |
+| G6 | 0.02 NSE margin for "close", 0.01 for "weather helps" | Set before any result; Paul may change them before the run |

@@ -112,9 +112,9 @@ def test_training_never_draws_a_held_out_catchment(monkeypatch):
     seen = set()
     original = lstm.cut_windows
 
-    def spy(tensors, catchment, day):
+    def spy(tensors, catchment, day, *args):
         seen.update(catchment.tolist())
-        return original(tensors, catchment, day)
+        return original(tensors, catchment, day, *args)
 
     monkeypatch.setattr(lstm, "cut_windows", spy)
     settings = lstm.Settings(hidden=4, batch=16, epochs=1, windows_per_epoch=32, validation_fraction=0.001)
@@ -136,3 +136,67 @@ def test_forecasts_are_in_flow_units_on_test_dates_only():
     assert (forecast["forecast"] >= 0).all()
     n_test_days = int((panel.split == "test").sum())
     assert len(forecast) == n_test_days * len(lstm.LEADS)
+
+
+def test_default_settings_are_those_of_experiment_6():
+    settings = lstm.Settings()
+    assert (settings.hidden, settings.dropout, settings.learning_rate, settings.batch) == (256, 0.4, 1e-3, 2048)
+    assert (settings.window, settings.weight_decay, settings.windows_per_epoch) == (365, 0.0, 2_000_000)
+
+
+def test_a_shorter_window_holds_only_that_many_days_ending_on_the_issue_day():
+    panel = make_panel()
+    tensors = lstm.to_tensors(panel, lstm.fit_scaler(panel, np.array([0, 1])), "cpu")
+    day = torch.tensor([400, 500])
+    short = lstm.cut_windows(tensors, torch.tensor([0, 1]), day, 90)
+    full = lstm.cut_windows(tensors, torch.tensor([0, 1]), day)
+    assert short.shape[1] == 90
+    assert torch.equal(short, full[:, -90:])
+    assert lstm.issue_days(panel, "train", 90).min() >= 89
+
+
+def _load_script(name):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_wet_to_dry_split_keeps_the_scored_catchments_out_of_both_training_sets():
+    import pandas as pd
+
+    run_lstm = _load_script("run_lstm")
+    gauges = [f"g{i:02d}" for i in range(20)]
+    attributes = pd.DataFrame({"gauge_id": gauges, "aridity": np.linspace(0.1, 1.0, 20)})
+    wet, dry, half, dry_control = run_lstm.wet_dry_split(attributes, gauges)
+    assert set(wet) | set(dry) == set(gauges) and not set(wet) & set(dry)
+    assert len(half) == len(wet)
+    assert set(dry_control) == set(dry) - set(half)
+    assert not set(dry_control) & set(wet) and not set(dry_control) & set(half)
+
+
+def test_tuning_candidates_are_valid_settings_and_include_the_original():
+    tune = _load_script("tune_lstm")
+    assert tune.CANDIDATES["c0_original"] == {}
+    for overrides in tune.CANDIDATES.values():
+        lstm.Settings(**overrides)
+
+
+def test_foundation_inputs_end_on_the_issue_day_and_carry_no_later_weather():
+    run_foundation = _load_script("run_foundation")
+    panel = make_panel()
+    # make_panel stores each day's number; store flow as log1p of it, as build_panel does.
+    panel.dynamic[..., lstm.FLOW] = np.log1p(panel.dynamic[..., lstm.FLOW])
+    day = 1000
+    (item,) = run_foundation.inputs_for(panel, 0, np.array([day]), "chronos2_weather")
+    assert len(item["target"]) == run_foundation.CONTEXT
+    assert np.isclose(item["target"][-1], day, rtol=1e-4)
+    assert np.isclose(item["target"][0], day - run_foundation.CONTEXT + 1, rtol=1e-4)
+    for series in item["past_covariates"].values():
+        assert len(series) == run_foundation.CONTEXT and series[-1] == day
+    (plain,) = run_foundation.inputs_for(panel, 0, np.array([day]), "chronos2_flow_only")
+    assert "past_covariates" not in plain

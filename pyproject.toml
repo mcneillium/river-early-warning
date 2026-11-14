@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 analysis = ["matplotlib", "scipy"]
+foundation = ["chronos-forecasting>=2.3,<3"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
