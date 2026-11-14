@@ -2,7 +2,7 @@
 
 **Author.** Paul McNeill. Written on 13 November 2026 from the logged results in this repository; not yet peer reviewed. Every number below comes from a table in `results/`.
 
-**How this work was produced.** Both studies were built making the use of AI tools, under research rules I set; each study’s log records how. I re-ran both on my own hardware, reviewed every logged decision, and take responsibility for the work and its conclusions.
+**How this work was produced.** Both studies were built making use of AI tools, under research rules I set; each study’s log records how. I re-ran both on my own hardware, reviewed every logged decision, and take responsibility for the work and its conclusions.
 
 ## 1. Question
 

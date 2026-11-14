@@ -201,5 +201,5 @@ it (14 November 2026). I re-ran Experiments 1 to 3 and 6 on my own machine on
 
 ### How this work was produced
 
-Both studies were built making the use of AI tools, under research rules I set; each study’s log records how. I re-ran both on my own hardware, reviewed every logged decision, and take responsibility for the work and its conclusions.
+Both studies were built making use of AI tools, under research rules I set; each study’s log records how. I re-ran both on my own hardware, reviewed every logged decision, and take responsibility for the work and its conclusions.
 
