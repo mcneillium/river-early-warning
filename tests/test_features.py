@@ -103,7 +103,7 @@ def test_seasonal_average_uses_training_years_only():
 
 def test_seasonal_average_follows_the_yearly_cycle():
     index = pd.date_range("2001-01-01", "2008-12-31", freq="D")
-    flow = pd.Series(5 + 3 * np.cos(2 * np.pi * index.dayofyear / 365.25), index=index)
+    flow = pd.Series(5 + 3 * np.cos(2 * np.pi * index.day_of_year / 365.25), index=index)
     climatology = seasonal.fit(flow, index[0], index[-1])
     assert climatology[0] > climatology[182]            # winter above summer
     assert abs(climatology[0] - 8.0) < 0.2

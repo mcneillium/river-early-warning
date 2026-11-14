@@ -80,7 +80,7 @@ def make_xy(
     features = features.loc[features.index.intersection(frame.index)]
 
     # Season of the target day, as a smooth yearly cycle.
-    day = features.index.dayofyear.to_numpy()
+    day = features.index.day_of_year.to_numpy()
     features["doy_sin"] = np.sin(2 * np.pi * day / 365.25)
     features["doy_cos"] = np.cos(2 * np.pi * day / 365.25)
 

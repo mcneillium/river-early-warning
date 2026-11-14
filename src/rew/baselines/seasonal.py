@@ -18,7 +18,7 @@ SMOOTHING_DAYS = 15
 def fit(flow: pd.Series, train_start: pd.Timestamp, train_end: pd.Timestamp) -> np.ndarray:
     """Return the smoothed day-of-year climatology (length 366, index 0 = 1 January)."""
     train = flow.loc[train_start:train_end].dropna()
-    by_day = train.groupby(train.index.dayofyear).mean().reindex(range(1, 367))
+    by_day = train.groupby(train.index.day_of_year).mean().reindex(range(1, 367))
     # 29 February in leap years is day 60 and shifts later days by one; with a
     # 15-day smoother that one-day offset is negligible. Day 366 has few
     # samples, so borrow from its neighbours before smoothing.
@@ -32,4 +32,4 @@ def fit(flow: pd.Series, train_start: pd.Timestamp, train_end: pd.Timestamp) -> 
 
 def predict(climatology: np.ndarray, dates: pd.DatetimeIndex) -> pd.Series:
     """Forecast for each target date from the fitted climatology."""
-    return pd.Series(climatology[dates.dayofyear.to_numpy() - 1], index=dates, name="seasonal")
+    return pd.Series(climatology[dates.day_of_year.to_numpy() - 1], index=dates, name="seasonal")
