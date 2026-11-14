@@ -195,8 +195,11 @@ LOG.md                   every decision and run, including what went wrong
 ## Status of this work
 
 Author: Paul McNeill. This is work in progress and has not been peer reviewed.
-Choices made during the unattended runs are listed in `LOG.md` (A1 to A13,
-B1 to B9, C1 to C8). As of 13 November 2026 I have not yet re-run the study on
-my own machine or confirmed those choices.
+Every choice made during the runs is listed in `LOG.md` with my decision on
+it (14 November 2026). I re-ran Experiments 1 to 3 and 6 on my own machine on
+14 November 2026; Experiment 5 has not been re-run there yet.
 
-<!-- TODO (Paul): restore a statement of how any AI tools were used before this goes to anyone else, and keep it accurate. -->
+### How this work was produced
+
+Both studies were built making the use of AI tools, under research rules I set; each study’s log records how. I re-ran both on my own hardware, reviewed every logged decision, and take responsibility for the work and its conclusions.
+
