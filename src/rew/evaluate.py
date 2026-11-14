@@ -55,6 +55,8 @@ def score_catchment_lead(
             table = metrics.contingency(today, forecast)
             onset_rate, onset_count = metrics.onset_hit_rate(today, before, forecast)
             row[f"{label}_events"] = table["hits"] + table["misses"]
+            row[f"{label}_hits"] = table["hits"]
+            row[f"{label}_warnings"] = table["hits"] + table["false_alarms"]
             row[f"{label}_hit_rate"] = metrics.hit_rate(table)
             row[f"{label}_far"] = metrics.false_alarm_ratio(table)
             row[f"{label}_csi"] = metrics.csi(table)

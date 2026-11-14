@@ -115,7 +115,10 @@ python scripts/run_lstm.py --tuned          # the chosen settings, three seeds, 
 python scripts/run_lstm.py --wet-to-dry     # train on wetter catchments, forecast drier ones
 ```
 
-Experiment 5 with more model seeds (protocol_week3.md, amendment 1; CPU):
+Experiment 5 re-run with model seeds 0, 1 and 2 (protocol_week3.md, amendments 1 and 2; CPU).
+Each seed writes to its own folders, `results/raw_quantiles_rerun_seedN/` and
+`results/exp5_seeds/seedN/`, so the original tables are never overwritten. Each
+run also writes coverage by season of the target date.
 
 ```bash
 python scripts/run_quantiles.py --seed 1 && python scripts/score_quantiles.py --seed 1
@@ -123,8 +126,10 @@ python scripts/run_quantiles.py --seed 1 && python scripts/score_quantiles.py --
 
 ### Experiment 7: a foundation model with no training (needs a GPU; not yet run)
 
-Protocol: `docs/protocol_week5.md`. The question and prediction must be
-written there first; the script will not run until they are.
+Protocol: `docs/protocol_week5.md`, with the question, prediction and margin
+fixed before the run. Tables go to `results/exp7/` (start with `results.md`).
+It needs the seen and wet-only LSTMs of Experiment 6 (three seeds) and the
+regional boosting forecasts of Experiment 3 (three seeds).
 
 ```bash
 pip install -e ".[foundation]"

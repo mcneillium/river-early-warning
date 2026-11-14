@@ -852,11 +852,14 @@ The per-seed ranges do not overlap for the wet-trained models at any lead.
   LSTM transfers as well as boosting or slightly better. When they are all
   wetter, it loses about 2 to 11 times as much skill (2.1, 10.9 and 4.4
   times at 1, 3 and 7 days).
-- Low flows: the wet-trained LSTM's low-flow CSI is zero (or undefined) in
-  81%, 92% and 94% of catchment-seed pairs at 1, 3 and 7 days; the
-  wet-trained boosting model's in 26%, 43% and 62%; the seen models' in 6%
-  to 23%. The wet-trained LSTM almost never warns correctly of low flow in
-  the drier catchments.
+- Low flows (corrected 14 November, night: zero and undefined were first
+  counted together). Low-flow CSI is zero, meaning defined but with no
+  correct warning, for the wet-trained LSTM in 75%, 86% and 88% of
+  catchment-seed pairs at 1, 3 and 7 days; for wet-trained boosting in 24%,
+  39% and 57%; for the seen models in 5% to 21%. It is undefined (no
+  observed or forecast low-flow days to score) in a separate 5% to 7% for
+  every model. The wet-trained LSTM almost never warns correctly of low
+  flow in the drier catchments.
 - Not tested, only a candidate explanation: the scaler and the catchment
   descriptors come from wet catchments only, so dry catchments' descriptors
   (aridity among them) lie outside the training range. Trees hold their
@@ -874,3 +877,73 @@ match it exactly) and changed `run_lstm.py` so a wet-to-dry run leaves them
 alone. The transfer-cost table is now written by `run_lstm.py`
 (`transfer_cost`); the table above was produced by that function from the
 saved per-catchment scores, with no retraining. One test added (91 pass).
+
+## 2026-11-14 (late night): Paul's decisions recorded; Experiments 5 and 7 prepared, not run
+
+Decisions by Paul, given in writing before any re-run seed of Experiment 5
+and before any Chronos-2 test-year forecast existed. Implemented by the
+assistant.
+
+### Record
+
+- **Random-half control, 1 day:** the exact LSTM-minus-boosting difference
+  is +0.01013, which crosses the 0.01 margin by +0.00013. It is reported as
+  crossing the rule, with how close it was.
+- **Low-flow CSI:** zero and undefined are now counted separately (entry
+  above, corrected the same night).
+
+### Experiment 7 (`docs/protocol_week5.md`)
+
+- Paul's question and prediction recorded word for word, with his note that
+  they are working hypotheses formulated after Experiments 1 to 6, with
+  drafting assistance.
+- One margin, 0.01 NSE, with an inclusive band from -0.01 to +0.01; the
+  draft's 0.02 "close" rule removed. The band is not an equivalence test.
+- `scripts/run_foundation.py`: each trained-model seed is scored separately
+  on common valid dates; paired differences are averaged over the three
+  seeds per catchment, then the median is taken. The seven predictions are
+  checked automatically (`table_predictions.csv`), with the boundaries as
+  written. New: the 167 dry catchments against the wet-trained LSTM and
+  boosting; zero and undefined counts and median denominators for every
+  warning score; a repeatability check; all outputs in `results/exp7/`.
+- `src/rew/evaluate.py`: two more columns per score row, `high_hits` /
+  `low_hits` and `high_warnings` / `low_warnings`, for the denominators. No
+  existing value changes; tables already written are untouched.
+
+### Experiment 5 (`docs/protocol_week3.md`, amendment 2)
+
+- Re-runs, seed 0 included, write to `results/raw_quantiles_rerun_seedN/`
+  and `results/exp5_seeds/seedN/`. Without `--seed` the scripts behave as
+  before. The original tables stay as published.
+- Seasonal coverage by the target date (DJF, MAM, JJA, SON), by lead and
+  seen or unseen, raw and after the conformal step, with catchment-level
+  summaries and observation counts. Calibration unchanged.
+
+### Checks
+
+- 95 tests pass on CPU (6 skipped: they need files not copied here). New
+  tests: seasonal counts worked by hand, the seed-averaged paired median
+  worked by hand, the band edges, and the prediction boundaries.
+- `score_quantiles.py --seed 0` run end to end on made-up quantile forecasts
+  in a scratch folder: all tables, the seasonal one included, were written
+  to `results/exp5_seeds/seed0/`, and no original table changed. The
+  made-up files were deleted.
+- `run_foundation.py --smoke` (5 catchments, 60 days, CPU) and its scoring
+  path run with stand-in trained models: within each seed, catchment and
+  lead, every model is scored on the same number of days.
+
+Nothing in this entry is a result. Experiments 5 (re-runs) and 7 stay
+pending until Paul runs them and the outputs are checked.
+
+### Note on the seed 0 re-run of Experiment 5
+
+Paul started `run_quantiles.py --seed 0` at 21:24 with the version of the
+script committed in 6a1f444, before the separate folders above existed, so
+its forecasts are going to `results/raw_quantiles/`. No such folder existed on
+this machine before (the original run's forecasts were never copied here), so
+nothing original is overwritten. The fitting code is identical in both
+versions (model seed 0, same row sample, same settings). When it finishes,
+the folder is renamed to `results/raw_quantiles_rerun_seed0/` and scored with
+`score_quantiles.py --seed 0`. No table from it had been written or read when
+amendment 2 was added.
+

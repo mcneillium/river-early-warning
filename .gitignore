@@ -19,3 +19,7 @@ phd-portfolio-plan.md
 *portfolio-plan*.md
 # Personal study notes and working rules
 notes/
+# Smoke runs check the code only; they are never results
+results/*smoke*
+# Scratch folder for files the assistant could not delete
+_to_delete/

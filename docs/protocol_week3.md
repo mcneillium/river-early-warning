@@ -111,3 +111,35 @@ settings and the same tree limit. Seed 0 is also re-run on a second machine.
 - The tree limit (1,000) is kept, so the 12 models that reached it in the
   first run may reach it again. How many do, per seed, is reported from the
   saved tree counts. Raising the limit would be a further amendment.
+
+## Amendment 2, 14 November 2026 (before any re-run seed result has been seen)
+
+Written before Experiment 5 was re-run with any seed on Paul's machine. No
+re-run result existed when it was written.
+
+### Where the re-runs go
+
+The original run and its tables (`results/table_quantile_warnings.*`,
+`results/table_interval_coverage.*`, `results/quantile_tau_choice.json`,
+`results/per_catchment_quantile.csv`) are kept as published.
+
+- `run_quantiles.py --seed N` writes forecasts to
+  `results/raw_quantiles_rerun_seedN/`, for N = 0, 1 and 2. Seed 0 is re-run
+  as well, as the second-machine check of the original.
+- `score_quantiles.py --seed N` writes every table to
+  `results/exp5_seeds/seedN/` and reads the regional point forecasts of the
+  same seed. Without `--seed`, both scripts behave as before.
+
+### Seasonal coverage, an evaluation breakdown
+
+- Seasons by the **target date**: DJF (December, January, February), MAM,
+  JJA and SON.
+- Reported by season, lead, and seen or unseen regions, before and after the
+  conformal step: coverage of the 90% range on all days, the median and 5th
+  percentile of catchment coverage, the share of catchments under 80%, the
+  median width, and the numbers of valid observations and catchments.
+- The calibration procedure is unchanged: one conformal adjustment for all
+  seasons, from the calibration half, as before. This is not seasonal
+  recalibration, and no setting is chosen from it.
+- Output: `table_interval_coverage_by_season.csv` and `.md` beside the other
+  tables of each run.

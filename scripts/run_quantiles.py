@@ -1,7 +1,9 @@
 """Experiment 5, stage 1: fit the quantile models and save their forecasts.
 
-    python scripts/run_quantiles.py              seed 0, as first reported
-    python scripts/run_quantiles.py --seed 1     a further model seed (protocol_week3.md, amendment 1)
+    python scripts/run_quantiles.py              the original run (seed 0), as first reported
+    python scripts/run_quantiles.py --seed N     a re-run with model seed N (protocol_week3.md, amendments 1 and 2);
+                                                 forecasts go to results/raw_quantiles_rerun_seedN/, so the
+                                                 original run is never overwritten
 
 Follows docs/protocol_week3.md. For each lead time:
 
@@ -43,7 +45,8 @@ def main() -> None:
     parser.add_argument("--data", type=Path, default=ROOT / "data")
     parser.add_argument("--results", type=Path, default=ROOT / "results")
     parser.add_argument("--leads", type=int, nargs="*", default=list(LEAD_DAYS))
-    parser.add_argument("--seed", type=int, default=0, help="model seed; the row sample does not change")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="re-run with this model seed into its own folder; the row sample does not change")
     args = parser.parse_args()
 
     saved = load_splits(ROOT / "splits" / "splits_v1.json")
@@ -51,7 +54,8 @@ def main() -> None:
     gauges = saved["gauge_ids"]
     folds = load_folds(ROOT / "splits" / "spatial_folds_v1.json")
     attributes = load_attributes(args.data)
-    raw_dir = args.results / ("raw_quantiles" if args.seed == 0 else f"raw_quantiles_seed{args.seed}")
+    raw_dir = args.results / ("raw_quantiles" if args.seed is None else f"raw_quantiles_rerun_seed{args.seed}")
+    seed = 0 if args.seed is None else args.seed
     raw_dir.mkdir(parents=True, exist_ok=True)
     jobs = jobs_for(gauges, folds)
 
@@ -76,7 +80,7 @@ def main() -> None:
         trees = json.loads(trees_path.read_text()) if trees_path.exists() else {}
         for name, train_gauges, predict_gauges, q in todo:
             started = time.time()
-            forecast, n_trees = quantile.fit_predict(tables, train_gauges, predict_gauges, q, seed=args.seed)
+            forecast, n_trees = quantile.fit_predict(tables, train_gauges, predict_gauges, q, seed=seed)
             out_path = raw_dir / f"lead{lead}_{name}.parquet"
             temporary = out_path.with_suffix(".tmp")
             forecast.to_parquet(temporary, index=False)

@@ -168,3 +168,34 @@ def test_unseen_quantile_model_forecasts_only_the_held_out_catchments():
     forecast, _ = quantile.fit_predict(tables, train, held_out, 0.95)
     assert set(forecast.loc[forecast["split"] == "test", "gauge_id"]) == held_out
     assert set(forecast.loc[forecast["split"] == "calibration", "gauge_id"]) == train
+
+
+def _load_script(name):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_seasonal_coverage_uses_the_target_date_and_counts_by_hand():
+    score = _load_script("score_quantiles")
+    dates = pd.to_datetime(["2013-12-31", "2014-01-15", "2014-02-28", "2014-03-01", "2014-06-01", "2014-11-30"])
+    block = pd.DataFrame({
+        "gauge_id": ["a", "a", "b", "a", "b", "a"],
+        "date": dates,
+        "obs": [1.0, 5.0, 2.0, 1.0, 1.0, 9.0],
+        "lo": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+        "hi": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+    })
+    rows = {r["season"]: r for r in score.seasonal_coverage(block, "lo", "hi", 1, "seen", "conformal")}
+    # December, January and February are winter: inside, outside, inside.
+    assert rows["DJF"]["n_observations"] == 3 and rows["DJF"]["n_catchments"] == 2
+    assert np.isclose(rows["DJF"]["coverage_all_days"], 2 / 3)
+    assert np.isclose(rows["DJF"]["coverage_median_catchment"], 0.75)  # a: 1/2, b: 1/1
+    assert rows["MAM"]["n_observations"] == 1 and rows["JJA"]["n_observations"] == 1
+    assert rows["SON"]["coverage_all_days"] == 0.0
+    assert np.isclose(rows["SON"]["median_width_mm_day"], 1.5)

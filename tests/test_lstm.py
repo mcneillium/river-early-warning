@@ -215,3 +215,40 @@ def test_transfer_cost_follows_the_rule_fixed_in_advance():
     assert costs.loc["wet_only", "lstm_transfers"] == "worse"  # -0.20 against -0.05
     assert abs(costs.loc["wet_only", "lstm_minus_boosting"] + 0.15) < 1e-9
     assert costs.loc["random_half", "lstm_transfers"] == "neither"  # -0.005 against -0.01
+
+
+def test_paired_difference_averages_over_seeds_then_takes_the_median():
+    import pandas as pd
+
+    run_foundation = _load_script("run_foundation")
+    rows = []
+    for seed in (0, 1, 2):
+        for gauge, (model, reference) in enumerate([(0.5, 0.6), (0.2, 0.1), (0.9, 0.95)]):
+            rows += [{"seed": seed, "lead_days": 1, "gauge_id": f"g{gauge}", "model": "m", "nse": model + 0.01 * seed},
+                     {"seed": seed, "lead_days": 1, "gauge_id": f"g{gauge}", "model": "r", "nse": reference}]
+    result = run_foundation.paired(pd.DataFrame(rows), "m", "r").iloc[0]
+    # Seed-averaged differences: -0.09, +0.11, -0.04; median -0.04.
+    assert abs(result["median_paired_difference"] + 0.04) < 1e-9
+    assert result["n_catchments"] == 3 and result["n_seeds"] == 3
+
+
+def test_one_margin_with_an_inclusive_band():
+    run_foundation = _load_script("run_foundation")
+    assert run_foundation.band(0.01) == "within the practical comparison band"
+    assert run_foundation.band(-0.01) == "within the practical comparison band"
+    assert run_foundation.band(0.0101) == "exceeds the improvement margin"
+    assert run_foundation.band(-0.0101) == "worse by more than the margin"
+
+
+def test_predictions_are_the_ones_recorded_with_their_boundaries():
+    run_foundation = _load_script("run_foundation")
+    tests = {(s, m, r, lead): t for s, m, r, lead, _, t in run_foundation.PREDICTIONS}
+    one = tests[("all", "chronos2_flow_only", "lstm_seen", 1)]
+    assert one(-0.05) and one(0.01) and not one(0.0101) and not one(-0.0501)
+    assert tests[("all", "chronos2_flow_only", "lstm_seen", 3)](-0.03)
+    assert tests[("all", "chronos2_flow_only", "lstm_seen", 7)](-0.05)
+    assert tests[("all", "chronos2_weather", "chronos2_flow_only", 1)](0.01)
+    assert not tests[("all", "chronos2_weather", "chronos2_flow_only", 3)](0.01)
+    dry = tests[("dry", "chronos2_weather", "lstm_wet_only", 1)]
+    assert not dry(0.01) and dry(0.0101)
+    assert len(run_foundation.PREDICTIONS) == 7

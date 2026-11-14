@@ -1,6 +1,7 @@
 """Experiment 5, stage 2: score the quantile forecasts.
 
-    python scripts/score_quantiles.py
+    python scripts/score_quantiles.py            the original run, tables in results/
+    python scripts/score_quantiles.py --seed N   a re-run (see run_quantiles.py), tables in results/exp5_seeds/seedN/
 
 Reads the forecasts saved by scripts/run_quantiles.py and follows
 docs/protocol_week3.md. Nothing is fitted here, so it runs in a few minutes
@@ -12,6 +13,9 @@ Outputs (all in results/)
     table_interval_coverage.csv / .md  honesty of the 90% range, before and after the conformal step
     table_quantile_reliability.csv     share of observations below each quantile
     per_catchment_quantile.csv         the per-catchment numbers behind the tables
+    table_interval_coverage_by_season.csv / .md
+                                       coverage, width and counts by season of the target date
+                                       (protocol_week3.md, amendment 2; an evaluation breakdown only)
 """
 
 from __future__ import annotations
@@ -104,6 +108,34 @@ def interval_row(label: str, stage: str, lead: int, block: pd.DataFrame, lower: 
     }
 
 
+SEASONS = {12: "DJF", 1: "DJF", 2: "DJF", 3: "MAM", 4: "MAM", 5: "MAM",
+           6: "JJA", 7: "JJA", 8: "JJA", 9: "SON", 10: "SON", 11: "SON"}
+
+
+def seasonal_coverage(block: pd.DataFrame, lower: str, upper: str, lead: int, regions: str, stage: str) -> list[dict]:
+    """Coverage and width by season of the target date (protocol_week3.md, amendment 2).
+
+    Only rows with an observation are passed in. Nothing is recalibrated: the
+    range is the one already built for all seasons together.
+    """
+    season = pd.DatetimeIndex(block["date"]).month.map(SEASONS)
+    rows = []
+    for name in ("DJF", "MAM", "JJA", "SON"):
+        part = block[np.asarray(season == name)]
+        inside = (part["obs"] >= part[lower]) & (part["obs"] <= part[upper])
+        per_catchment = inside.groupby(part["gauge_id"]).mean()
+        rows.append({
+            "lead_days": lead, "regions": regions, "stage": stage, "season": name,
+            "coverage_all_days": float(inside.mean()) if len(part) else float("nan"),
+            "coverage_median_catchment": float(per_catchment.median()) if len(per_catchment) else float("nan"),
+            "coverage_5th_percentile_catchment": float(per_catchment.quantile(0.05)) if len(per_catchment) else float("nan"),
+            "share_catchments_below_80pct": float((per_catchment < 0.80).mean()) if len(per_catchment) else float("nan"),
+            "median_width_mm_day": float((part[upper] - part[lower]).median()) if len(part) else float("nan"),
+            "n_observations": int(len(part)), "n_catchments": int(per_catchment.size),
+        })
+    return rows
+
+
 def csi_only(event: np.ndarray, forecast: np.ndarray) -> float:
     return metrics.csi(metrics.contingency(event, forecast))
 
@@ -111,12 +143,18 @@ def csi_only(event: np.ndarray, forecast: np.ndarray) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--leads", type=int, nargs="*", default=list(LEAD_DAYS))
-    parser.add_argument("--seed", type=int, default=0, help="score the quantile models of this seed")
+    parser.add_argument("--seed", type=int, default=None, help="score the re-run with this model seed")
     parsed = parser.parse_args()
     leads, seed = parsed.leads, parsed.seed
-    tag = "" if seed == 0 else f"_seed{seed}"
     results = ROOT / "results"
-    raw_dir = results / f"raw_quantiles{tag}"
+    if seed is None:
+        raw_dir, out_dir, point_dir = results / "raw_quantiles", results, results / "raw_regional"
+    else:
+        raw_dir = results / f"raw_quantiles_rerun_seed{seed}"
+        out_dir = results / "exp5_seeds" / f"seed{seed}"
+        point_dir = results / ("raw_regional" if seed == 0 else f"raw_regional_seed{seed}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    tag = ""
     saved = load_splits(ROOT / "splits" / "splits_v1.json")
     config = config_from_splits(saved)
     gauges = saved["gauge_ids"]
@@ -132,6 +170,7 @@ def main() -> None:
     thresholds = {g: train_thresholds(frames[g]["flow"], train_start, train_end) for g in gauges}
 
     choice, warning_rows, interval_rows, reliability_rows, catchment_rows = {}, [], [], [], []
+    season_rows = []
     for lead in leads:
         loaded = load_seen(raw_dir, lead)
         crossing_notes = dict(loaded.attrs)
@@ -148,7 +187,7 @@ def main() -> None:
         band_columns = [f"band_{name}" for name in Q_COLUMNS]
         seen[band_columns] = band
 
-        point = pd.read_parquet(results / f"raw_regional{tag}" / f"lead{lead}_regional_seen.parquet").rename(
+        point = pd.read_parquet(point_dir / f"lead{lead}_regional_seen.parquet").rename(
             columns={"forecast": "regional_point"}
         )
         seen = seen.merge(point, on=["gauge_id", "date"], how="left")
@@ -202,6 +241,10 @@ def main() -> None:
         interval_rows.append(interval_row("quantile model, unseen", "raw", lead, unseen, "lower", "upper", 0.0))
         interval_rows.append(interval_row("quantile model, unseen", "conformal", lead, unseen,
                                           "adj_lower", "adj_upper", mean_adjustment))
+        for label, block, lower, upper in (("seen", test, LOW_COL, HIGH_COL), ("seen", test, "adj_lower", "adj_upper"),
+                                           ("unseen", unseen, "lower", "upper"), ("unseen", unseen, "adj_lower", "adj_upper")):
+            stage = "conformal" if lower == "adj_lower" else "raw"
+            season_rows.extend(seasonal_coverage(block, lower, upper, lead, label, stage))
 
         # ----- choose the warning quantiles on the calibration half -----
         choice[f"lead{lead}"] = {"quantile_crossing": crossing_notes}
@@ -264,7 +307,7 @@ def main() -> None:
         gc.collect()
 
     per_catchment = pd.DataFrame(catchment_rows)
-    per_catchment.to_csv(results / f"per_catchment_quantile{tag}.csv", index=False)
+    per_catchment.to_csv(out_dir / f"per_catchment_quantile{tag}.csv", index=False)
     grouped = per_catchment.groupby(["lead_days", "model"], observed=True)
     warnings_table = grouped[WARNING_METRICS].median()
     warnings_table["warnings_per_event_high"] = grouped.apply(
@@ -273,11 +316,25 @@ def main() -> None:
         lambda g: g["low_warnings"].sum() / max(g["low_events"].sum(), 1), include_groups=False)
     warnings_table["n_catchments"] = grouped["gauge_id"].nunique()
     warnings_table = warnings_table.reset_index()
-    warnings_table.to_csv(results / f"table_quantile_warnings{tag}.csv", index=False)
+    warnings_table.to_csv(out_dir / f"table_quantile_warnings{tag}.csv", index=False)
     intervals = pd.DataFrame(interval_rows)
-    intervals.to_csv(results / f"table_interval_coverage{tag}.csv", index=False)
-    pd.DataFrame(reliability_rows).to_csv(results / f"table_quantile_reliability{tag}.csv", index=False)
-    (results / f"quantile_tau_choice{tag}.json").write_text(json.dumps(choice, indent=1))
+    intervals.to_csv(out_dir / f"table_interval_coverage{tag}.csv", index=False)
+    pd.DataFrame(reliability_rows).to_csv(out_dir / f"table_quantile_reliability{tag}.csv", index=False)
+    (out_dir / f"quantile_tau_choice{tag}.json").write_text(json.dumps(choice, indent=1))
+    seasons = pd.DataFrame(season_rows)
+    seasons.to_csv(out_dir / "table_interval_coverage_by_season.csv", index=False)
+    season_lines = ["The 90% range by season of the target date (DJF, MAM, JJA, SON), test period.",
+                    "An evaluation breakdown only: the range is calibrated once for all seasons, as before.", "",
+                    "| Lead | Regions | Stage | Season | Coverage, all days | Median catchment | 5th percentile catchment "
+                    "| Catchments under 80% | Median width (mm/day) | Observations | Catchments |",
+                    "| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
+    for _, row in seasons.iterrows():
+        season_lines.append(
+            f"| {int(row['lead_days'])} | {row['regions']} | {row['stage']} | {row['season']} | "
+            f"{row['coverage_all_days']:.3f} | {row['coverage_median_catchment']:.3f} | "
+            f"{row['coverage_5th_percentile_catchment']:.3f} | {100 * row['share_catchments_below_80pct']:.0f}% | "
+            f"{row['median_width_mm_day']:.3f} | {int(row['n_observations']):,} | {int(row['n_catchments'])} |")
+    (out_dir / "table_interval_coverage_by_season.md").write_text("\n".join(season_lines) + "\n")
 
     order = ["persistence", "regional_point", "persistence_band", "quantile_model"]
     lines = ["Median across catchments, test period (water years 2013 to 2022). No future weather.",
@@ -298,7 +355,7 @@ def main() -> None:
             lines.append(f"| {model} | " + " | ".join(
                 "" if pd.isna(row[m]) else f"{row[m]:.3f}" for m in WARNING_METRICS) + " |")
         lines.append("")
-    (results / f"table_quantile_warnings{tag}.md").write_text("\n".join(lines))
+    (out_dir / f"table_quantile_warnings{tag}.md").write_text("\n".join(lines))
 
     lines = ["The 90% range (0.05 to 0.95 quantile) on the test period. Target coverage: 0.90.",
              "`conformal` = after the calibration step, which uses 2009 to 2012 only.",
@@ -311,7 +368,7 @@ def main() -> None:
             f"{row['coverage_median_catchment']:.3f} | {row['coverage_5th_percentile_catchment']:.3f} to "
             f"{row['coverage_95th_percentile_catchment']:.3f} | {100 * row['share_catchments_below_80pct']:.0f}% | "
             f"{row['median_width_mm_day']:.3f} |")
-    (results / f"table_interval_coverage{tag}.md").write_text("\n".join(lines) + "\n")
+    (out_dir / f"table_interval_coverage{tag}.md").write_text("\n".join(lines) + "\n")
     print("Tables written", flush=True)
 
 

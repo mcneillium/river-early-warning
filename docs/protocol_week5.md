@@ -1,9 +1,9 @@
 # Protocol for Experiment 7: a time-series foundation model with no training
 
-Drafted on 14 November 2026 by the assistant, **before** this experiment was
-run. Paul writes the question and the prediction below, in his own words and
-with the date, before the full run. `scripts/run_foundation.py` refuses to
-start while either section still says "TO BE WRITTEN BY PAUL".
+Drafted on 14 November 2026 by the assistant; the question, the prediction
+and the margin were set by Paul the same evening, **before** this experiment
+was run. All of it was fixed before any Chronos-2 forecast on the test years
+existed (only a 60-day CPU smoke run, which is not a result).
 
 ## Background
 
@@ -18,16 +18,43 @@ November 2026; to be confirmed against the reading list).
 
 ## Question
 
-TO BE WRITTEN BY PAUL. (A suggestion to rewrite, not to copy: with the same
-365 days of history and no future weather, how close does a forecasting model
-never trained on rivers come to the trained regional LSTM and boosting model
-at 1, 3 and 7 days, and does adding past weather help it?)
+Written by Paul on 14 November 2026, before the run:
+
+> How does zero-shot Chronos-2 compare with persistence, regional boosting
+> and the regional LSTM when forecasting daily flow in British catchments at
+> 1, 3 and 7 days? Does adding past weather improve its performance, and how
+> does it compare with wet-trained models on the same 167 dry catchments?
 
 ## What I expect, and why
 
-TO BE WRITTEN BY PAUL, dated. Say for each lead whether you expect Chronos-2
-to be within 0.05 NSE of the LSTM, better than persistence, and whether the
-weather covariates will help.
+Written by Paul on 14 November 2026, before the run. These are working
+hypotheses, not estimates from an existing Chronos-2 run. They were
+formulated after seeing the earlier river results (Experiments 1 to 6 and
+the wet-to-dry follow-up), with drafting assistance.
+
+**Flow-only Chronos-2 against the seen regional LSTM**
+
+| Lead | Predicted median paired NSE difference |
+| ---: | --- |
+| 1 day | Between -0.05 and +0.01 |
+| 3 days | -0.03 or lower |
+| 7 days | -0.05 or lower |
+
+Calculated as follows: each catchment's NSE difference on identical valid
+dates, averaged across the three LSTM seeds, then the median across
+catchments. Positive means Chronos-2 performs better.
+
+**Chronos-2 with past weather against flow-only Chronos-2:** a median paired
+NSE improvement of at least 0.01 at one day, but less than 0.01 at three and
+seven days.
+
+**On the 167 dry catchments:** Chronos-2 with past weather will exceed the
+wet-trained LSTM by more than 0.01 median paired NSE at one day. All three
+leads are reported, but the three- and seven-day dry-subset comparisons are
+secondary analyses without directional predictions.
+
+Boundaries as written: "between" includes both ends; "or lower" and "at
+least" include the value; "less than" and "more than" exclude it.
 
 ## Models
 
@@ -44,24 +71,67 @@ weather covariates will help.
 - The saved splits; the test years (water years 2013 to 2022) only. Every
   issue day whose target date at a lead is in the test years, as in
   Experiment 6.
-- Scored exactly as in Experiments 1 to 6, beside persistence, the regional
-  boosting model and the LSTM (seed 0 of each), on identical days.
-- The foundation model is deterministic given its inputs, so there are no
-  seeds. The trained models' seed-to-seed spread (Experiments 3 and 6) is the
-  yardstick for whether a gap matters.
+- Scored exactly as in Experiments 1 to 6 (the same thresholds and score
+  functions), as set out below.
 
-## What would count as a result, fixed now
+## One improvement margin, fixed now
 
-- At each lead, the gap is the median, across catchments, of Chronos-2's NSE
-  minus the LSTM's NSE, with the share of catchments where Chronos-2 is
-  better.
-- "Close to the trained model" means a median gap within 0.02 NSE, a
-  margin fixed now. The LSTM's seed-to-seed spread is reported beside it.
-  Anything else is reported as a gap of that size.
-- The weather covariates "help" if `chronos2_weather` beats
-  `chronos2_flow_only` by more than 0.01 median NSE.
-- Coverage of the 90% range is reported beside Experiment 5's calibrated
-  quantile model.
+0.01 NSE throughout, applied to a median paired difference (model minus
+reference):
+
+- above +0.01: exceeds the predefined improvement margin;
+- below -0.01: worse by more than that margin;
+- between -0.01 and +0.01, inclusive: within the practical comparison band.
+
+The band does not establish statistical equivalence. The prediction
+thresholds above are separate from this interpretation rule. (The draft's
+separate 0.02 "close" rule was removed on 14 November 2026, before the run.)
+
+## Paired comparisons
+
+For each trained-model seed s (0, 1, 2): every model in a comparison is
+scored on the days where all of them have a forecast and an observation.
+For each catchment the NSE difference is computed per seed and averaged over
+the three seeds; the median across catchments is reported with the share of
+catchments where the model is better. A catchment counts only if it has a
+difference for all three seeds. Chronos-2's forecasts are the same in every
+seed's comparison; only the trained models change.
+
+All catchments: each Chronos-2 variant against the seen LSTM, the seen
+regional boosting model and persistence, and the two variants against each
+other.
+
+## The 167 dry catchments
+
+The exact list of the wet-to-dry test (rebuilt by `run_lstm.wet_dry_split`
+and checked against the boosting files): Chronos-2 (both variants) against
+the wet-trained LSTM, wet-trained boosting, their seen references and
+persistence, on common valid dates at each lead. Chronos-2 has no
+wet-trained and broadly trained pair, so no transfer cost is computed for it;
+the comparison is of absolute performance on the same catchments and dates.
+
+## Scores reported
+
+NSE and KGE, and for high and low flow: CSI, hit rate, false alarm ratio and
+onset hit rate. Each score is averaged over seeds per catchment. Zero and
+undefined scores are counted separately (undefined: no seed gives a value,
+for example no observed or forecast events), and the median is over the
+catchments where the score is defined. Median per-catchment denominators are
+reported: events (hit rate), warnings (false alarm ratio), events plus false
+alarms (CSI) and onsets (onset hit rate), with catchment counts. Coverage
+and width of Chronos-2's 90% range are reported; they can be read against
+Experiment 5's table, but that range is calibrated and this one is not.
+
+## Repeatability
+
+Chronos-2 has no seed. The first two catchments are forecast twice and the
+largest difference is recorded (`results/exp7/repeatability.json`). Its
+forecasts are not presented as independent seeds.
+
+## Outputs
+
+Tables in `results/exp7/`; raw forecasts in `results/raw_foundation/`. No
+earlier table is written by this experiment.
 
 ## Stage 2 (not built yet): hourly
 
@@ -73,9 +143,9 @@ been read, as a further amendment.
 
 ## Limits known in advance
 
-- Chronos-2 may have seen some public river series during pretraining; its
-  training data are not fully listed, so "never trained on rivers" means
-  never trained on these rivers by this study.
+- Chronos-2 is zero-shot with respect to this study: it is not trained or
+  tuned on these data. It may have seen public river series in pretraining;
+  that would need an audit of its pretraining sources, which is not done.
 - It cannot use the 35 catchment descriptors, which the LSTM and boosting
   model both use.
 - Raw flow in mm/day is given to the model; a log transform might change the
