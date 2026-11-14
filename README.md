@@ -3,8 +3,8 @@
 **Status:** done so far: data, metrics and baselines (week 1); the baseline
 repair and the unseen-region experiment with a regional boosting model
 (week 2); quantile forecasts, conformal calibration and quantile-based
-warnings (Experiment 5). Still to come: the regional LSTM (needs a GPU), gaps
-in the inputs, explanations. A first report is in
+warnings (Experiment 5). The regional LSTM is written and tested but not yet run (it needs a GPU).
+Still to come: gaps in the inputs, explanations. A first report is in
 `docs/report.md`.
 
 ## Question
@@ -83,6 +83,26 @@ python scripts/plot_quantiles.py       # figures/warnings_by_lead.png, interval_
 
 The baseline run is resumable: forecasts are saved per catchment under
 `results/raw/`, and a restarted run skips catchments that are already done.
+
+### Experiment 6: the regional LSTM (needs a GPU)
+
+Not yet run. Protocol: `docs/protocol_week4.md`.
+
+```bash
+# PyTorch built for CUDA 12.8. RTX 50-series cards need this build or newer.
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+
+python scripts/run_lstm.py --smoke     # two-minute check of the code, CPU is fine
+python scripts/run_lstm.py             # three seeds, all catchments
+python scripts/run_lstm.py --unseen    # adds the unseen-region test (five times the cost)
+```
+
+The version printed must end in `+cu128` (or a newer CUDA build) and the
+second value must be `True`. Run `scripts/run_regional.py` first if
+`results/raw_regional/` is missing: the LSTM is then scored beside the
+regional boosting model on identical days. Finished models are not trained
+again, so the script can be stopped and restarted.
 
 ## Results
 

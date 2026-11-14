@@ -493,3 +493,40 @@ The tables in this repository were always correct.
 - The public history starts from a single commit. The earlier commits are
   kept privately.
 - Data licence terms were checked and recorded in `CITATION.md`.
+
+## 2026-11-14: Experiment 6 written, not yet run
+
+The regional LSTM (`src/rew/lstm.py`, `scripts/run_lstm.py`) and its protocol
+(`docs/protocol_week4.md`) were written today. No result exists yet: the full
+run needs a GPU.
+
+What has been checked:
+
+- Eight new tests (91 in all, passing). One found a real fault before any
+  run: forecasts for the last six test days at the 1-day lead and the last
+  four at the 3-day lead were never made, because issue days stopped seven
+  days before the end of the record for every lead. Fixed by padding the
+  targets past the end of the record and letting each lead run to its own
+  last day.
+- `--smoke` runs end to end on a CPU (12 catchments, 2 short epochs). Its
+  scores mean nothing.
+- A slightly longer CPU check on 12 catchments (hidden size 48, 6 epochs of
+  25,600 windows) learned: median NSE 0.60, 0.28 and 0.17 at 1, 3 and 7 days
+  against persistence at 0.39, -0.10 and -0.26 on the same catchments. This
+  only shows the code trains. It is not a result and is not reported.
+
+### Choices made in writing it, for Paul to confirm or change
+
+| # | Choice | Reason | Alternative |
+| --- | --- | --- | --- |
+| E1 | One model with three outputs (1, 3, 7 days) | A third of the training cost | One model per lead, as boosting has |
+| E2 | Observed flow up to the issue day is an input | Same information as boosting; this is forecasting, not simulation | No flow input, as in Kratzert et al. (2019), which answers a different question |
+| E3 | 365-day window | The usual choice in the literature | 90 days, to match boosting's memory exactly |
+| E4 | Hidden size 256, dropout 0.4, learning rate 0.001, not tuned | Follows Kratzert et al. (2019) | Tune on validation years |
+| E5 | Batch 2,048 | Uses a large GPU well | 256, as in the literature |
+| E6 | Squared error on standardised log flow | Same target scale as the chosen boosting variant | The catchment-weighted NSE loss of Kratzert et al. |
+| E7 | Missing inputs set to the training mean, with a flag for missing flow | Keeps every window usable | Drop windows with any gap |
+| E8 | An epoch is 2,000,000 random windows; up to 30; stop after 4 without improvement on a fixed 20% validation sample | Bounded cost; about 8 million windows exist | Full passes |
+| E9 | Seeds 0, 1, 2 | Matches Experiment 3 | More seeds |
+| E10 | "No better" means within 0.01 median NSE of regional boosting, or below | Fixed before the run | A different margin |
+
