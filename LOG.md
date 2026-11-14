@@ -593,3 +593,32 @@ No setting was changed after seeing these numbers. Any follow-up (a lower
 learning rate, a smaller model, weight decay) would be chosen on validation
 years only, written as a dated amendment first, and labelled exploratory.
 
+## 2026-11-14: second-machine re-run and the paired LSTM comparison
+
+Paul re-ran `run_baselines.py`, `run_gbm_variants.py` and `run_regional.py`
+(seeds 0, 1, 2) on his Windows machine, then `run_lstm.py` again, which
+reused the three trained LSTMs and scored them beside the regional boosting
+model on identical days.
+
+**Reproduction.** Weeks 1 and 2 reproduce exactly (largest difference in any
+median 4e-16). The variant chosen on validation years is `log_es100` again.
+The regional models agree to within 0.006 on every median NSE, KGE and
+high-flow or low-flow CSI, and within 0.013 for the wet-to-dry tables. No
+conclusion changes. Details: `results/reproduction_second_machine.md`. The
+first-run tables stay as the published record.
+
+**Paired comparison (protocol, Experiment 6).** NSE per catchment, LSTM
+minus regional boosting:
+
+| Lead | Seed 0 | Seed 1 | Seed 2 | Pooled | LSTM better in |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | -0.013 | -0.030 | -0.013 | -0.019 | 16% |
+| 3 | +0.003 | +0.002 | +0.003 | +0.002 | 57% |
+| 7 | -0.000 | -0.001 | +0.009 | +0.002 | 56% |
+
+Median NSE, mean of seeds: LSTM 0.734, 0.377, 0.239; boosting 0.764, 0.375,
+0.235. Under the 0.01 rule the LSTM is no better at any lead. The first of
+the limits recorded this morning (no paired comparison) is now closed. The
+others stand: one untuned configuration that overfits within two short
+epochs, and no unseen-region run.
+
