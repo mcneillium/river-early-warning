@@ -652,3 +652,28 @@ one epoch), which makes its own held-out cost look small (+0.001), so the
 What remains: one untuned configuration; the overfitting within two short
 epochs; no LSTM in the wet-to-dry test.
 
+## 2026-11-14: corrections from a review of the logged choices
+
+A review of the choices against the literature found two errors in how they
+were written. Neither changes a number.
+
+- **Threshold names (A10, entry 7, protocol week 3).** "Q95" and "Q10" here
+  mean the 95th and 10th percentiles of daily flow in the training years: a
+  high-flow event is flow above the 95th percentile, a low-flow event flow
+  below the 10th. UK hydrology writes flows the other way round, as the flow
+  exceeded for a given share of the time, so the National River Flow
+  Archive's Q95 is a low flow. In that convention the high threshold here is
+  Q5 and the low threshold is Q90. From now on this study writes "the 95th
+  percentile" and "the 10th percentile". The CAMELS-GB descriptors named
+  `Q5` and `Q95` in `regional.py` keep the dataset's own names.
+- **E3 and E4.** Kratzert et al. (2019) used 270-day input sequences, not
+  365. They are the source for hidden size 256 and dropout 0.4 only; the
+  learning rate was not checked against the paper. See amendment 1 in
+  `docs/protocol_week4.md`.
+- **E10.** "No better" means the LSTM did not exceed the predefined
+  improvement margin of 0.01 median NSE. It is not a test of equivalence.
+
+The review also raised design points (repeated permutations for the leak
+demonstration, nested preprocessing inside the inner tuning folds, missing
+data flags for every input). They are design changes, not corrections, and
+wait for Paul's decision on each logged choice.

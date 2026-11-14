@@ -94,3 +94,17 @@ the first run has been read.
   boosting, so the warning scores are expected to stay poor.
 - Exact reproduction is not guaranteed: results on a GPU are not
   bit-for-bit repeatable across machines or library versions.
+
+## Amendment 1, 14 November 2026 (after the run)
+
+Correction to the justification under "Size and training", made after the
+results existed and changing no setting. Kratzert et al. (2019) used input
+sequences of 270 time steps, 256 memory cells and dropout 0.4. This study
+uses a 365-day window, so it follows that paper for hidden size and dropout
+only. The learning rate of 0.001 was not checked against the paper. The
+365-day window remains a design choice made before the run; "follows
+Kratzert et al. (2019)" should not be read as covering it.
+
+Interpretation of the 0.01 rule: a result inside the margin means the LSTM
+did not exceed the predefined improvement margin. It does not show that the
+two models are equivalent.
