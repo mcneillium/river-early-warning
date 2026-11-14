@@ -64,7 +64,7 @@ conda activate rew
 pip install -e .[dev]
 
 python -m rew.download --dest data     # about 790 MB, no login needed
-pytest                                 # 83 tests
+pytest                                 # 91 tests (83 if PyTorch is not installed)
 python scripts/run_baselines.py        # week 1: results/table_baselines.*
 
 # week 2 (protocol in docs/protocol_week2.md)
