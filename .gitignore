@@ -1,0 +1,21 @@
+# Data is downloaded by `python -m rew.download`, never committed
+data/
+# Raw per-catchment predictions are large and reproducible
+results/raw*/
+# Caches and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+# Local environment and editor files
+.venv/
+.vscode/
+.idea/
+# Private planning notes must never be published
+phd-portfolio-plan.md
+*portfolio-plan*.md
+# Personal study notes and working rules
+notes/

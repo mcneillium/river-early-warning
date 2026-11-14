@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it using the details below."
+type: software
+title: "River early warning across 671 British catchments"
+authors:
+  - family-names: McNeill
+    given-names: Paul Martin
+    affiliation: "Queen's University Belfast"
+repository-code: "https://github.com/mcneillium/river-early-warning"
+license: MIT
+version: 0.1.0
+abstract: >-
+  Code, protocols and results for a study of how far ahead river flow and high-flow or low-flow warnings can be forecast without future weather, on the CAMELS-GB v2 catchments, including transfer to unseen regions and calibrated uncertainty. Work in progress; not peer reviewed.

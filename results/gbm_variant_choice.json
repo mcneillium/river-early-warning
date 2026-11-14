@@ -1,0 +1,26 @@
+{
+ "chosen": "log_es100",
+ "nse_floor": 0.3885578989406781,
+ "variants": {
+  "raw_es30": {
+   "warning_score": 0.18227474380611366,
+   "mean_nse": 0.4085578989406781,
+   "eligible": true
+  },
+  "log_es30": {
+   "warning_score": 0.2428147551486768,
+   "mean_nse": 0.39893221155411923,
+   "eligible": true
+  },
+  "raw_es100": {
+   "warning_score": 0.18528320255791272,
+   "mean_nse": 0.40873067192255075,
+   "eligible": true
+  },
+  "log_es100": {
+   "warning_score": 0.2429856492321313,
+   "mean_nse": 0.3990446413398228,
+   "eligible": true
+  }
+ }
+}

@@ -1,0 +1,26 @@
+# Create with:  conda env create -f environment.yml
+# Then:         conda activate rew  &&  pip install -e .[dev]
+#
+# If conda-forge does not carry one of these exact versions, create the
+# environment with only python=3.12 and pip, then run:
+#     pip install -r requirements-lock.txt
+#
+# These are the versions the week 1 results were produced with, except Python:
+# the first run used Python 3.13 in a Linux container (see LOG.md). 3.12 is
+# pinned here because it is the version chosen for local work on Windows.
+name: rew
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy=2.5
+  - pandas=3.0
+  - pyarrow=26
+  - pyyaml=6
+  - lightgbm=4.7
+  - scikit-learn=1.9
+  - scipy=1.18
+  - matplotlib=3.11
+  - joblib=1.6
+  - pytest=9
+  - pip

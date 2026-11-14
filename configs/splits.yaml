@@ -1,0 +1,20 @@
+# Split boundaries, in water years (1 October to 30 September).
+# A row belongs to a split according to the date of its TARGET (the day being
+# forecast). Inputs may reach back across a boundary; targets may not.
+version: 1
+train:
+  start: "1970-10-01"
+  end: "2004-09-30"
+validation:
+  start: "2004-10-01"
+  end: "2012-09-30"
+test:
+  start: "2012-10-01"
+  end: "2022-09-30"
+
+# A catchment is used only if it has at least this many days of observed flow
+# in each split. Catchments that fail are listed in the splits file.
+min_flow_days:
+  train: 1826       # 5 years
+  validation: 365   # 1 year
+  test: 730         # 2 years
