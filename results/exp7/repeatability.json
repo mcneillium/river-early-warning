@@ -1,0 +1,16 @@
+{
+ "chronos2_flow_only": {
+  "catchments": [
+   "10002",
+   "10003"
+  ],
+  "max_abs_difference_mm_day": 0.0
+ },
+ "chronos2_weather": {
+  "catchments": [
+   "10002",
+   "10003"
+  ],
+  "max_abs_difference_mm_day": 0.0
+ }
+}

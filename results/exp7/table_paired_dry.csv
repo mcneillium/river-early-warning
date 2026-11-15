@@ -1,0 +1,25 @@
+model,reference,lead_days,median_paired_difference,share_model_better,n_catchments,n_seeds,interpretation
+chronos2_weather,lstm_wet_only,1,0.012915687931308595,0.5209580838323353,167,3,exceeds the improvement margin
+chronos2_weather,lstm_wet_only,3,0.00541519070327227,0.5329341317365269,167,3,within the practical comparison band
+chronos2_weather,lstm_wet_only,7,-0.01332476318077902,0.4550898203592814,167,3,worse by more than the margin
+chronos2_flow_only,lstm_wet_only,1,0.010327597993644097,0.5209580838323353,167,3,exceeds the improvement margin
+chronos2_flow_only,lstm_wet_only,3,0.0052970889798770555,0.5209580838323353,167,3,within the practical comparison band
+chronos2_flow_only,lstm_wet_only,7,-0.012653160074443356,0.4491017964071856,167,3,worse by more than the margin
+chronos2_weather,regional_wet_only,1,-0.0995408763315534,0.3532934131736527,167,3,worse by more than the margin
+chronos2_weather,regional_wet_only,3,-0.05879292390081866,0.31736526946107785,167,3,worse by more than the margin
+chronos2_weather,regional_wet_only,7,-0.06301244207789829,0.3413173652694611,167,3,worse by more than the margin
+chronos2_flow_only,regional_wet_only,1,-0.09448101301238354,0.3592814371257485,167,3,worse by more than the margin
+chronos2_flow_only,regional_wet_only,3,-0.06088779201798067,0.31137724550898205,167,3,worse by more than the margin
+chronos2_flow_only,regional_wet_only,7,-0.06194622650801055,0.3473053892215569,167,3,worse by more than the margin
+chronos2_weather,lstm_seen,1,-0.11404434514288853,0.24550898203592814,167,3,worse by more than the margin
+chronos2_weather,lstm_seen,3,-0.06964452546664353,0.11976047904191617,167,3,worse by more than the margin
+chronos2_weather,lstm_seen,7,-0.07883656207934746,0.08982035928143713,167,3,worse by more than the margin
+chronos2_weather,regional_seen,1,-0.1367427802517164,0.20359281437125748,167,3,worse by more than the margin
+chronos2_weather,regional_seen,3,-0.07039986897197263,0.1437125748502994,167,3,worse by more than the margin
+chronos2_weather,regional_seen,7,-0.07711408320252915,0.1437125748502994,167,3,worse by more than the margin
+chronos2_weather,chronos2_flow_only,1,-0.00037013569177113403,0.46107784431137727,167,3,within the practical comparison band
+chronos2_weather,chronos2_flow_only,3,0.00021133079439927815,0.5209580838323353,167,3,within the practical comparison band
+chronos2_weather,chronos2_flow_only,7,0.0005922626976638812,0.5209580838323353,167,3,within the practical comparison band
+chronos2_weather,persistence,1,0.026097977200596256,0.8023952095808383,167,3,exceeds the improvement margin
+chronos2_weather,persistence,3,0.17456258452842044,0.9520958083832335,167,3,exceeds the improvement margin
+chronos2_weather,persistence,7,0.2879707826520723,0.9401197604790419,167,3,exceeds the improvement margin

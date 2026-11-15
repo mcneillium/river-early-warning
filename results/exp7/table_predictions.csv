@@ -1,0 +1,8 @@
+subset,model,reference,lead_days,predicted,observed,met
+all,chronos2_flow_only,lstm_seen,1,between -0.05 and +0.01,-0.12925843186362898,False
+all,chronos2_flow_only,lstm_seen,3,-0.03 or lower,-0.07329754503111834,True
+all,chronos2_flow_only,lstm_seen,7,-0.05 or lower,-0.08310847850662288,True
+all,chronos2_weather,chronos2_flow_only,1,at least +0.01,-0.00037013569177113403,False
+all,chronos2_weather,chronos2_flow_only,3,less than +0.01,-2.5527132074376624e-05,True
+all,chronos2_weather,chronos2_flow_only,7,less than +0.01,-0.0007798477083306166,True
+dry,chronos2_weather,lstm_wet_only,1,more than +0.01,0.012915687931308595,True

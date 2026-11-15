@@ -1043,3 +1043,97 @@ the original run reported 12.
   over-covers spring to autumn and under-covers winter. This is an
   evaluation breakdown; nothing was recalibrated.
 
+### Seed 2 confirmed (15 November)
+
+`scripts/check_quantile_repeat.py` refitted two of the six seed 2 models that
+came from the first process (lead 7 seen_q05, lead 1 seen_q05) on Paul's
+machine. Both refits are identical to the saved files (largest difference
+0.0; 476 and 1,000 trees, as saved). Fits are repeatable on one machine, so
+the mixed folder is the same as a single run would have produced. Seed 2 is
+no longer provisional. Record: `results/exp5_seeds/repeat_checks.jsonl`.
+
+Also: the earlier install line `pip install -e ".[foundation]" --no-deps`
+did not install chronos-forecasting (the `--no-deps` skipped it). The
+assistant's mistake; Experiment 7 had not run.
+
+## 2026-11-15 (15:00): Experiment 7 results, checked
+
+Run by Paul on his RTX 5090 (flow-only 14 minutes, with weather 55
+minutes); checked by the assistant against `docs/protocol_week5.md`. Tables
+in `results/exp7/`. Repeatability: the same inputs forecast twice differ by
+0.0. Persistence, LSTM and boosting scores match Experiment 6 (median NSE at
+1 day 0.509, 0.736 and 0.762 here, against 0.509, 0.734 and 0.764 there; the
+small differences come from averaging over seeds per catchment first).
+
+### The predictions recorded before the run
+
+| Prediction | Observed | Met |
+| --- | ---: | --- |
+| Flow-only against the seen LSTM, 1 day: between -0.05 and +0.01 | -0.129 | no |
+| Same, 3 days: -0.03 or lower | -0.073 | yes |
+| Same, 7 days: -0.05 or lower | -0.083 | yes |
+| With weather against flow-only, 1 day: at least +0.01 | -0.0004 | no |
+| Same, 3 days: less than +0.01 | -0.00003 | yes |
+| Same, 7 days: less than +0.01 | -0.0008 | yes |
+| Dry subset, with weather against the wet-trained LSTM, 1 day: more than +0.01 | +0.0129 | yes |
+
+Four of seven met. The two misses carry the most information:
+
+- **The 1-day gap is much larger than predicted** (-0.129; Chronos-2 better
+  in 15% of catchments). Chronos-2 beats persistence (+0.062, better in 88%)
+  but stays far below the trained models at every lead (-0.07 to -0.15
+  against both, better in 5% to 15% of catchments).
+- **Past weather adds nothing.** The paired difference is centred on zero at
+  every lead (5th to 95th percentile per catchment about -0.02 to +0.02).
+- **The dry-subset prediction is met narrowly.** +0.0129, better in 52% of
+  the 167 catchments; flow-only Chronos-2 also crosses the margin
+  (+0.0103), so it is not an effect of the weather. At 3 days the
+  difference is within the band (+0.005) and at 7 days worse (-0.013); both
+  secondary. Chronos-2 is well below wet-trained boosting (-0.09 to -0.10 at
+  1 day, better in 35% to 36%).
+
+### Why (an illustration, two catchments)
+
+Catchments 33022 (median LSTM gap) and 33018 (a large gap), 1 day ahead.
+Change in forecast flow from the issue day, on the wettest 5% of issue days:
+
+| | 33022 | 33018 |
+| --- | ---: | ---: |
+| Observed change | +0.37 | +0.84 |
+| LSTM | +0.36 | +0.62 |
+| Chronos-2, flow only | -0.06 | -0.63 |
+| Chronos-2, with weather | -0.01 | -0.41 |
+
+(mm/day.) Rain on the issue day is in every model's inputs. The LSTM has
+learned that heavy rain means a rise; Chronos-2 forecasts recession either
+way, and the weather inputs only soften that slightly. The warning scores
+agree: Chronos-2's 1-day high-flow onset hit rate is 0.000 (flow only) and
+0.014 (with weather), against 0.291 for the LSTM and 0.349 for boosting.
+This is two catchments; a check across all 659 has not been done.
+
+### Other results, without predictions
+
+- **Low flow:** at 3 and 7 days Chronos-2's low-flow CSI (0.488 and 0.374,
+  flow only) is above the trained models' (0.312 and 0.147 for the LSTM),
+  but below persistence's (0.545 and 0.389). Its low-flow skill is
+  persistence-like.
+- **Dry catchments, low flow:** Chronos-2 does not share the wet-trained
+  LSTM's failure: low-flow CSI 0.650 at 1 day with 4 catchments at zero,
+  against 0.000 with 114 at zero for the wet-trained LSTM and 0.405 (36 at
+  zero) for wet-trained boosting. Persistence: 0.717.
+- **90% range, uncalibrated:** coverage 0.899, 0.876 and 0.843 (flow only)
+  at 1, 3 and 7 days, against Experiment 5's calibrated 0.902 to 0.907.
+  Close to nominal at 1 day; too narrow at longer leads.
+
+### What this means
+
+A general forecasting model, used with no training, is a strong
+persistence-plus-recession baseline for British rivers, but not a substitute
+for a trained model. It does not turn past rainfall into an expected rise.
+On a climate shift it avoids the wet-trained LSTM's low-flow collapse, but
+wet-trained boosting still beats it on NSE.
+
+Limits: one foundation model; raw flow (not log); 365-day context; the
+mechanism table covers two catchments; the predictions were written after
+Experiments 1 to 6 had been seen, with drafting assistance.
+
