@@ -947,3 +947,99 @@ the folder is renamed to `results/raw_quantiles_rerun_seed0/` and scored with
 `score_quantiles.py --seed 0`. No table from it had been written or read when
 amendment 2 was added.
 
+### Seed 0 re-run interrupted and resumed (14 November, 22:35)
+
+The folder was renamed at about 21:56, while the original process was still
+fitting lead 3, so that process stopped: its last complete file is
+`lead3_seen_q05.parquet` (21:55). Files are written to a temporary name and
+then renamed, so every file present is complete; no partial file was found.
+`score_quantiles.py --seed 0` was started too early and stopped at lead 3
+with a missing file. It wrote no table (the folder `results/exp5_seeds/seed0/`
+is empty). Before stopping it printed one line for lead 1: conformal
+adjustment +0.000 (seen) and +0.003 (unseen, mean of folds). That line was
+seen; nothing else from the re-run was.
+
+The fit resumes with `run_quantiles.py --seed 0`, which skips the models
+already present and writes the rest to the same folder. The fitting code is
+the same in both versions.
+
+## 2026-11-15 (02:00): Experiment 5 re-runs, checked
+
+Run by Paul (Windows, Python 3.14) overnight; checked by the assistant
+against protocol_week3.md amendments 1 and 2. Tables in
+`results/exp5_seeds/seed0/`, `seed1/`, `seed2/`; the original tables are
+unchanged.
+
+### Two processes fitted seed 1 and seed 2
+
+The first loop (started 21:24) had not stopped: after its seed 0 fit failed
+at the folder rename, it went on to fit seed 1 (22:00 to 22:53) and seed 2
+(from 22:57). The second command line (started about 22:36) resumed seed 0,
+found seed 1 complete and scored it again, then fitted seed 2 about 12
+minutes behind the first loop, overwriting its files. So the seed 2 folder
+holds 45 models from the second process and 6 from the first (lead 1
+seen_q05 to seen_q50, lead 7 seen_q05 and seen_q10). Every file is complete,
+and all 45 tree counts in `lead*_trees.json` match the second process's
+printout. **Seed 2 is provisional** until a same-machine refit of one of the
+six (`scripts/check_quantile_repeat.py`) shows identical forecasts.
+
+### Seed 0 re-run against the original (second machine)
+
+- Warning quantiles chosen on the calibration half: identical at every lead,
+  for both the quantile model and the persistence band.
+- Pure persistence: identical in every catchment, so data, dates and
+  thresholds match.
+- Tables differ by at most 0.017 (5th-percentile catchment coverage); medians
+  of the warning scores by at most 0.007.
+- The quantile models themselves differ between platforms: refitting one
+  seed 2 model on Linux gave 344 trees against 476 on Windows, and forecasts
+  up to 1.9 mm/day apart. LightGBM results are not repeatable across these
+  platforms, as the second-machine check of 14 November also found on a
+  smaller scale.
+- **A tie fragility in the persistence band baseline.** Its 1-day low-flow
+  warnings changed in a few catchments (33020: 135 to 831 warnings). Flows
+  are recorded to 0.01 mm/day, and some catchments sit exactly on their
+  low-flow threshold for long spells. The band rebuilds flow as
+  expm1(log1p(flow) + offset) with an offset of exactly 0 at 1 day; on Linux
+  (the original run) that returns the threshold exactly, so the strict
+  "below the threshold" test gives no warning; on Windows it lands one
+  rounding step below and warns. In the four catchments checked the change
+  in warning count equals the number of test days at the threshold (696,
+  175, 146 against 145, 30). Pure persistence compares raw flow and is not
+  affected. Whether to amend the baseline (compare in log space, or treat
+  "at the threshold" explicitly) is Paul's decision; any change would be an
+  amendment and the published band results would stay as they are.
+
+### Each finding of Experiment 5, by seed (seed 2 provisional)
+
+Medians across catchments, test years.
+
+| Finding | Original | Seed 0 | Seed 1 | Seed 2 | Holds in all three |
+| --- | --- | --- | --- | --- | --- |
+| Quantile warnings repair the single-number failure at 7 days: high CSI 0.005 to 0.175 | 0.005 / 0.175 | 0.005 / 0.175 | 0.000 / 0.174 | 0.000 / 0.173 | yes |
+| Same, low CSI 0.173 to 0.426 | 0.173 / 0.426 | 0.173 / 0.426 | 0.155 / 0.427 | 0.147 / 0.427 | yes |
+| High flow at 3 days: a tie with the persistence band (median per-catchment CSI difference, quantile minus band) | +0.002 | +0.002 | +0.003 | +0.002 | yes |
+| 7-day high CSI, quantile minus band | +0.014 | +0.014 | +0.015 | +0.015 | yes |
+| High-flow false alarm ratio, quantile model, 3 / 7 days | 0.753 / 0.802 | 0.752 / 0.802 | 0.752 / 0.803 | 0.754 / 0.805 | yes (75 to 80%) |
+| Seen 90% range after calibration, coverage 1 / 3 / 7 days | 0.902 / 0.905 / 0.907 | 0.902 / 0.904 / 0.908 | 0.903 / 0.904 / 0.907 | 0.903 / 0.905 / 0.907 | yes |
+| Narrower than the persistence band, 1 / 3 / 7 days | 66% / 25% / 19% | 66% / 25% / 19% | 66% / 26% / 18% | 66% / 26% / 18% | yes |
+| Unseen regions: share of catchments under 80% coverage, 1 / 3 / 7 days | 14% / 17% / 18% | 14% / 17% / 17% | 13% / 18% / 16% | 12% / 16% / 17% | yes (about 1 in 6) |
+
+The single-number model's 7-day high CSI is 0.000 in seeds 1 and 2 against
+0.005 in seed 0: it is near zero in every seed.
+
+Models at the 1,000-tree limit: 9 of 51 (seed 0), 7 (seed 1), 6 (seed 2);
+the original run reported 12.
+
+### Seasonal coverage (amendment 2; conformal stage; all three seeds)
+
+- **Winter is the weak season.** Seen catchments: coverage in DJF is 0.884 to
+  0.892 at every lead and seed, just under the 0.90 target, against 0.905 to
+  0.917 in the other seasons.
+- Unseen regions: DJF coverage 0.850 to 0.858, and 22% to 26% of catchments
+  under 80%, against 9% to 22% in the other seasons. JJA is the best season
+  for unseen regions (13% to 14% under 80% at 3 and 7 days).
+- The pooled 0.90 hides this: calibration for all seasons together slightly
+  over-covers spring to autumn and under-covers winter. This is an
+  evaluation breakdown; nothing was recalibrated.
+
